@@ -64,7 +64,7 @@ def create_brick_body(verts, indices, center, mass=1.0):
         int: PyBullet body ID
     """
     
-    vis_shape = p.createVisualShape(p.GEOM_MESH, vertices=verts, indices=indices, rgbaColor=[.2, .5, .8, 1])
+    vis_shape = p.createVisualShape(p.GEOM_MESH, vertices=verts, indices=indices, rgbaColor=[.529, .808, .922, 1])
     col_shape = p.createCollisionShape(p.GEOM_MESH, vertices=verts)
     body_id = p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=col_shape, 
                               baseVisualShapeIndex=vis_shape, basePosition=center)
