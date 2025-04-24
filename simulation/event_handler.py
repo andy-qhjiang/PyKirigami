@@ -1,10 +1,10 @@
 """
 Event handler for interactive kirigami simulation.
 
-This module provides functions to handle keyboard and mouse events in the PyBullet simulation:
-- 'r' key: Reset the simulation to its initial state
-- 'v' key: Save current vertex positions to a file for MATLAB processing
-- Mouse click with 'd' key: Delete a specific tile/brick from the simulation
+This module provides functions to handle interactive sliders in the PyBullet GUI:
+- **Reset simulation** slider: Reset the simulation to its initial state
+- **Save vertices** slider: Save current top-face vertex coordinates to a file for MATLAB processing
+- **Delete tile index** slider: Select a tile index to delete; moving the slider to any valid index removes that tile and its constraints in real time
 """
 import os
 import time

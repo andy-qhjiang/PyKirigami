@@ -143,3 +143,13 @@ This project is provided for academic and educational purposes.
 ## Acknowledgments
 
 This framework is designed for research in computational design and simulation of kirigami structures.
+
+## Interactive Controls (PyBullet GUI Sliders)
+
+After starting the simulation with `run_sim.py`, the PyBullet OpenGL GUI will display an interactive parameter panel on the right. Use the following sliders to control the running simulation in real time:
+
+- **Reset simulation**: Drag above 0.5 to tear down and reinitialize the entire kirigami model from the original input files.
+- **Save vertices**: Drag above 0.5 to write the current top‑face vertex coordinates (12 values per face) to a timestamped file in the `output/` directory.
+- **Delete tile index**: Range from –1 (no deletion) to N–1 (maximum tile index). Set to a valid 0‑based tile index to immediately remove that tile and all its constraints; after deletion, you can return the slider to –1 or choose another index.
+
+These GUI sliders replace keyboard shortcuts — there is no need to press keys or click in the window. Simply move a slider past its threshold to invoke the corresponding action without restarting the script.
