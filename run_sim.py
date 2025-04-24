@@ -119,6 +119,11 @@ def run_simulation(args):
             'normals': normals,
             'brick_centers': brick_centers,
             'top_vertices': top_vertices,
+            # local offsets of top vertices relative to each brick center
+            'local_top_vertices': [[
+                [v[k] - center[k] for k in range(3)]
+                for v in tile_top_vertices
+            ] for tile_top_vertices, center in zip(top_vertices, brick_centers)],
             'original_data': original_sim_data
         }
         
@@ -146,26 +151,30 @@ def run_simulation(args):
     # After stabilization, create debug sliders for interactive controls
     reset_param = p.addUserDebugParameter("Reset simulation", 0, 1, 0)
     save_param = p.addUserDebugParameter("Save vertices", 0, 1, 0)
-    delete_param = p.addUserDebugParameter("Delete tile index", 0, len(bricks) - 1, -1)
+    delete_param = p.addUserDebugParameter("Delete tile index", -1, len(bricks) - 1, -1)  # range includes -1 to disable deletion
+    last_reset_val = 0
+    last_save_val = 0
     last_delete_idx = -1
-    
+
     try:
         while p.isConnected():
-            # Poll debug parameters instead of keyboard events
-            if p.readUserDebugParameter(reset_param) > 0.5:
+            # Edge-detect reset slider
+            current_reset = p.readUserDebugParameter(reset_param)
+            if current_reset > 0.5 and last_reset_val <= 0.5:
                 print("Reset slider triggered")
-                # Reset the slider
-                p.resetUserDebugParameter(reset_param, 0)
-                # Reinitialize
+                # Reinitialize simulation
                 for b in bricks:
                     p.removeBody(b)
                 sim_data, force_tiles, force_function = initialize_simulation()
                 event_handler = EventHandler(sim_data)
-                continue
-            if p.readUserDebugParameter(save_param) > 0.5:
+            last_reset_val = current_reset
+            # Edge-detect save slider
+            current_save = p.readUserDebugParameter(save_param)
+            if current_save > 0.5 and last_save_val <= 0.5:
                 print("Save slider triggered")
-                p.resetUserDebugParameter(save_param, 0)
                 event_handler._save_vertex_locations()
+            last_save_val = current_save
+            # Delete via slider index
             delete_idx = int(p.readUserDebugParameter(delete_param))
             if delete_idx != last_delete_idx and 0 <= delete_idx < len(bricks):
                 print(f"Deleting via slider index: {delete_idx}")

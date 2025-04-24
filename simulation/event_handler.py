@@ -198,6 +198,10 @@ class EventHandler:
         # that affect other bodies
         self.constraints_map = {}
         self._map_constraints_to_bodies()
+        # Step a few frames so the GUI refreshes without waiting for the main loop
+        for _ in range(10):
+            p.stepSimulation()
+            time.sleep(0.001)
     
     def _save_vertex_locations(self):
         """Save current vertex locations to a file for MATLAB processing"""
@@ -212,25 +216,28 @@ class EventHandler:
                 
             output_file = os.path.join(output_dir, f"vertices_{timestamp}.txt")
             
+            # Compute world positions of top face vertices for each brick
             brick_data = []
-            for brick_id in self.simulation_data['bricks']:
+            for idx, brick_id in enumerate(self.simulation_data['bricks']):
                 position, orientation = p.getBasePositionAndOrientation(brick_id)
-                # Get the vertices in world coordinates
-                vertices = []
-                for i in range(p.getNumVertices(brick_id, -1)):
-                    vertex = p.getVertex(brick_id, i, -1)
-                    vertices.append(vertex)
-                brick_data.append((position, orientation, vertices))
+                # Get local top-vertex offsets stored at initialization
+                offsets = self.simulation_data['local_top_vertices'][idx]
+                # Rotation matrix from body orientation
+                rot = p.getMatrixFromQuaternion(orientation)
+                rot_mat = np.array(rot).reshape(3, 3)
+                world_vertices = []
+                for offset in offsets:
+                    world_v = (rot_mat.dot(np.array(offset)) + np.array(position)).tolist()
+                    world_vertices.append(world_v)
+                brick_data.append((idx, world_vertices))
             
             with open(output_file, 'w') as f:
-                # Write header
-                f.write("% Kirigami Simulation Vertex Data\n")
-                f.write("% Format: BrickID, Position_X, Position_Y, Position_Z, Orientation_X, Orientation_Y, Orientation_Z, Orientation_W\n")
-                
-                # Write brick data
-                for i, (position, orientation, vertices) in enumerate(brick_data):
-                    f.write(f"{i+1} {position[0]} {position[1]} {position[2]} {orientation[0]} {orientation[1]} {orientation[2]} {orientation[3]}\n")
-                
+                # Write 12 values per tile: top-face world coordinates
+                for idx, verts in brick_data:
+                    # flatten vertices [ [x,y,z], ... ] into a single line
+                    line = ' '.join(str(coord) for vert in verts for coord in vert)
+                    f.write(line + "\n")
+            
             print(f"Saved vertex data to {output_file}")
         except Exception as e:
             print(f"Error saving vertex data: {e}")
