@@ -10,7 +10,7 @@ Note: This script expects 3D vertex data (12 values per line: x,y,z for 4 vertic
       For 2D data, users must preprocess files by adding z=0 to each point.
 
 Usage:
-    python unified_sim.py --vertices_file [file] --constraints_file [file] --force_type [type]
+    python run_sim.py --vertices_file [file] --constraints_file [file] --force_type [type]
 """
 import os
 import sys
@@ -31,19 +31,35 @@ from simulation.event_handler import EventHandler
 
 def run_simulation(args):
     """Run the kirigami simulation with the specified parameters"""
-    global bricks, normals, event_handler
+    # Use local variables instead of global or nonlocal
+    bricks = []
+    normals = []
     
-    # Store original simulation parameters for potential reset
+    # Store original simulation parameters
     original_sim_data = {}
     
-    # Initialize physics
+    # Initialize physics engine
     client_id = setup_physics_engine(
         gravity=(0, 0, args.gravity),
         timestep=args.timestep,
         substeps=args.substeps
     )
     
-    # Set up camera for better visualization
+    # Determine if we should show labels (disable for better performance with large simulations)
+    show_labels = not (args.no_labels or args.performance_mode)
+    if not show_labels:
+        print("Tile labels disabled for better performance")
+    
+    # Set additional performance optimizations
+    if args.performance_mode:
+        print("Performance mode enabled - optimizing simulation settings")
+        p.setPhysicsEngineParameter(enableConeFriction=0)
+        p.setPhysicsEngineParameter(numSolverIterations=4)  # Default is 10
+        # Disable debug visualization for better performance
+        p.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, 0)
+        p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 0)
+    
+    # Set up camera
     p.resetDebugVisualizerCamera(
         cameraDistance=6.0,
         cameraYaw=45,
@@ -53,9 +69,13 @@ def run_simulation(args):
     
     if args.ground_plane:
         create_ground_plane()
-    
+        
+    # Define the simulation initialization function
     def initialize_simulation():
         nonlocal original_sim_data
+        # Create new local lists for bricks and normals
+        local_bricks = []
+        local_normals = []
         
         # Load data
         vertices = load_vertices_from_file(args.vertices_file)
@@ -78,32 +98,34 @@ def run_simulation(args):
         force_function = get_force_direction_function(args.force_type)
         
         # Create bricks
-        bricks.clear()
-        normals.clear()
         brick_centers = []
         top_vertices = []
+        bottom_vertices = []
         
+        # Create each brick
         for i, tile_vertices in enumerate(vertices):
             # Create brick geometry
-            verts, indices, center, tile_top_vertices, normal = create_3d_brick(
+            verts, indices, center, tile_bottom_vertices, tile_top_vertices, normal = create_3d_brick(
                 tile_vertices, args.brick_thickness
             )
             
             # Create brick body in physics engine
             brick_id = create_brick_body(verts, indices, center)
             
-            bricks.append(brick_id)
+            local_bricks.append(brick_id)
             brick_centers.append(center)
             top_vertices.append(tile_top_vertices)
-            normals.append(normal)
+            bottom_vertices.append(tile_bottom_vertices)
+            local_normals.append(normal)
         
         # Stabilize bricks
-        stabilize_bodies(bricks, 
+        stabilize_bodies(local_bricks, 
                         linear_damping=args.linear_damping, 
                         angular_damping=args.angular_damping)
         
         # Create constraints between bricks
-        create_constraints_between_bricks(bricks, constraints, top_vertices, brick_centers)
+        connection_mode = 'bottom' if args.connection_mode is None else args.connection_mode
+        create_constraints_between_bricks(local_bricks, constraints, bottom_vertices, top_vertices, brick_centers, connection_mode)
         
         # Prepare simulation data for event handler
         sim_data = {
@@ -115,11 +137,11 @@ def run_simulation(args):
             'constraints': constraints,
             'force_tiles': force_tiles,
             'force_function': force_function,
-            'bricks': bricks,
-            'normals': normals,
+            'bricks': local_bricks,
+            'normals': local_normals,
             'brick_centers': brick_centers,
             'top_vertices': top_vertices,
-            # local offsets of top vertices relative to each brick center
+            'bottom_vertices': bottom_vertices,
             'local_top_vertices': [[
                 [v[k] - center[k] for k in range(3)]
                 for v in tile_top_vertices
@@ -129,83 +151,82 @@ def run_simulation(args):
         
         return sim_data, force_tiles, force_function
     
+    # Define the force application function
+    def apply_forces(whole_center):
+        
+         force_tiles = event_handler.simulation_data['force_tiles']
+         force_function = event_handler.simulation_data['force_function']
+         force_magnitude = args.force_magnitude
+         
+         # Use the current brick and normal lists directly from the event handler
+         current_bricks = event_handler.simulation_data['bricks']
+         current_normals = event_handler.simulation_data['normals']
+         
+         # Apply forces to specific tiles
+         force_brick_ids = [brick_id for idx, brick_id in enumerate(current_bricks) 
+                         if idx in force_tiles and idx < len(current_bricks)]
+         
+         force_normals = [norm for idx, norm in enumerate(current_normals) 
+                       if idx in force_tiles and idx < len(current_normals)]
+         
+         # Apply appropriate forces based on force type
+         if args.force_type == 'outward':
+             for i, body_id in enumerate(force_brick_ids):
+                 center_pos, orientation = p.getBasePositionAndOrientation(body_id)
+                 force_dir = force_function(center_pos, whole_center)
+                 force = [force_magnitude * d for d in force_dir]
+                 p.applyExternalForce(body_id, -1, force, center_pos, flags=p.WORLD_FRAME)
+         else:
+             apply_force_to_bodies(force_brick_ids, force_function, force_magnitude, force_normals)
+    
     # Initialize simulation for the first time
     sim_data, force_tiles, force_function = initialize_simulation()
     
+    # Create simulation functions dict
+    simulation_functions = {
+        'initialize_simulation': initialize_simulation,
+        'apply_forces': apply_forces
+    }
+    
     # Create event handler
-    event_handler = EventHandler(sim_data)
+    event_handler = EventHandler(sim_data, simulation_functions, show_labels=show_labels)
     
     # Wait for the scene to stabilize
     for _ in range(100):
         p.stepSimulation()
         time.sleep(args.timestep)
     
-    # Interactive simulation loop
+    # Set up UI controls and start interactive simulation
     print("Starting interactive simulation...")
-    print("Controls:")
-    print("  'r' - Reset simulation")
-    print("  'v' - Save vertices to file for MATLAB")
-    print("  'd' - Toggle delete mode (then click on a tile to delete it)")
-    print("  'Ctrl+C' - Exit simulation")
+    print("Controls available through GUI sliders:")
+    print("  - Reset: Drag 'Reset simulation' slider above 0.5")
+    print("  - Save: Drag 'Save vertices' slider above 0.5")
+    print("  - Delete: Enter the tile index shown on the tile, then press the delete button")
+    print("  - Show/Hide Labels: Toggle tile index labels visibility")
+    print("  - Label update frequency: Control how often labels are updated")
     
-    # After stabilization, create debug sliders for interactive controls
-    reset_param = p.addUserDebugParameter("Reset simulation", 0, 1, 0)
-    save_param = p.addUserDebugParameter("Save vertices", 0, 1, 0)
-    delete_param = p.addUserDebugParameter("Delete tile index", -1, len(bricks) - 1, -1)  # range includes -1 to disable deletion
-    last_reset_val = 0
-    last_save_val = 0
-    last_delete_idx = -1
-
+    # Performance tips
+    num_bricks = len(sim_data['bricks'])
+    if num_bricks > 100 and show_labels:
+        print(f"\nPerformance tip: Your simulation has {num_bricks} tiles.")
+        print("For better performance with large simulations, use --no-labels or --performance-mode")
+    
+    # Set up UI controls
+    event_handler.setup_ui_controls()
+    
+    # Main simulation loop
     try:
         while p.isConnected():
-            # Edge-detect reset slider
-            current_reset = p.readUserDebugParameter(reset_param)
-            if current_reset > 0.5 and last_reset_val <= 0.5:
-                print("Reset slider triggered")
-                # Reinitialize simulation
-                for b in bricks:
-                    p.removeBody(b)
-                sim_data, force_tiles, force_function = initialize_simulation()
-                event_handler = EventHandler(sim_data)
-            last_reset_val = current_reset
-            # Edge-detect save slider
-            current_save = p.readUserDebugParameter(save_param)
-            if current_save > 0.5 and last_save_val <= 0.5:
-                print("Save slider triggered")
-                event_handler._save_vertex_locations()
-            last_save_val = current_save
-            # Delete via slider index
-            delete_idx = int(p.readUserDebugParameter(delete_param))
-            if delete_idx != last_delete_idx and 0 <= delete_idx < len(bricks):
-                print(f"Deleting via slider index: {delete_idx}")
-                event_handler._remove_brick(bricks[delete_idx])
-            last_delete_idx = delete_idx
+            # Handle UI events (buttons, sliders, etc.)
+            result = event_handler.handle_ui_events()
+            if result:  # If simulation was reset
+                sim_data = result
+                # No need to update local variables as we now use event_handler's data directly
             
-            # Calculate the center of the structure
-            current_positions = [p.getBasePositionAndOrientation(brick_id)[0] 
-                                for brick_id in bricks]
-            if current_positions:  # Check if there are any bricks left
-                whole_center = np.mean(current_positions, axis=0)
+            # Step the simulation (includes force application and label updates)
+            event_handler.step_simulation()
             
-                # Apply forces to specific tiles
-                force_brick_ids = [brick_id for idx, brick_id in enumerate(bricks) 
-                                if idx in force_tiles and idx < len(bricks)]
-                
-                force_normals = [norm for idx, norm in enumerate(normals) 
-                              if idx in force_tiles and idx < len(normals)]
-                
-                # Pass whole_center for outward force calculation
-                if args.force_type == 'outward':
-                    for i, body_id in enumerate(force_brick_ids):
-                        center_pos, orientation = p.getBasePositionAndOrientation(body_id)
-                        force_dir = force_function(center_pos, whole_center)
-                        force = [args.force_magnitude * d for d in force_dir]
-                        p.applyExternalForce(body_id, -1, force, center_pos, flags=p.WORLD_FRAME)
-                else:
-                    apply_force_to_bodies(force_brick_ids, force_function, args.force_magnitude, force_normals)
-            
-            # Step simulation
-            p.stepSimulation()
+            # Pause to maintain frame rate
             time.sleep(args.timestep)
             
     except KeyboardInterrupt:
@@ -234,11 +255,6 @@ if __name__ == "__main__":
         potential_path = os.path.join(data_dir, args.hull_file)
         if os.path.exists(potential_path):
             args.hull_file = potential_path
-    
-    # Global variables
-    bricks = []
-    normals = []
-    event_handler = None
     
     # Run the simulation
     run_simulation(args)

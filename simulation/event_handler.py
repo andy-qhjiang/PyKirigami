@@ -1,10 +1,12 @@
 """
 Event handler for interactive kirigami simulation.
 
-This module provides functions to handle interactive sliders in the PyBullet GUI:
-- **Reset simulation** slider: Reset the simulation to its initial state
-- **Save vertices** slider: Save current top-face vertex coordinates to a file for MATLAB processing
-- **Delete tile index** slider: Select a tile index to delete; moving the slider to any valid index removes that tile and its constraints in real time
+This module provides a comprehensive handler for the kirigami simulation interactive controls
+through the PyBullet GUI, including:
+- Reset simulation
+- Save vertex data
+- Delete tiles
+- Display and update tile labels
 """
 import os
 import time
@@ -13,33 +15,57 @@ import pybullet as p
 from datetime import datetime
 
 class EventHandler:
-    def __init__(self, simulation_data):
+    def __init__(self, simulation_data, simulation_functions, show_labels=True):
         """
         Initialize the event handler with simulation data.
         
         Args:
-            simulation_data: Dictionary containing simulation data:
-                - vertices_file: Path to original vertices file
-                - constraints_file: Path to constraints file
-                - hull_file: Path to hull file (optional)
-                - args: Command-line arguments
-                - vertices: Original vertex data
-                - constraints: Constraint data
-                - force_tiles: Tile indices to apply forces to
-                - force_function: Function to calculate force direction
-                - bricks: List of brick body IDs
-                - normals: List of normal vectors for each brick
-                - original_data: Any other data needed for reset
+            simulation_data: Dictionary containing simulation data
+            simulation_functions: Dictionary containing functions for simulation control:
+                - initialize_simulation: Function to reinitialize the simulation
+                - apply_forces: Function to apply forces to tiles
+            show_labels: Whether to show tile index labels (default: True)
         """
         self.simulation_data = simulation_data
-        self.selected_brick_id = None
-        self.delete_mode = False
+        self.simulation_functions = simulation_functions
         self.constraints_map = {}  # Maps body_id to list of constraint IDs
-        self._map_constraints_to_bodies()
+        self.tile_labels = {}      # Maps brick_id to its text label ID
+        self.ui_controls = {}      # Stores UI control IDs
+        self.labels_visible = show_labels
+        self.update_frequency = 5  # Only update labels every N frames for performance
+        self.frame_counter = 0
         
-        # Register event handlers
-        p.configureDebugVisualizer(p.COV_ENABLE_KEYBOARD_SHORTCUTS, 0)
-        p.setRealTimeSimulation(1)
+        # State tracking for edge detection
+        self.last_reset_val = 0
+        self.last_save_val = 0
+        self.last_delete_button_val = 0
+        self.last_label_toggle_val = 1 if show_labels else 0
+        
+        # Map constraints
+        self._map_constraints_to_bodies()
+    
+    def setup_ui_controls(self):
+        """Set up UI controls for interactive simulation"""
+        # Create debug controls
+        self.ui_controls['reset_param'] = p.addUserDebugParameter("Reset simulation", 0, 1, 0)
+        self.ui_controls['save_param'] = p.addUserDebugParameter("Save vertices", 0, 1, 0)
+        
+        # Simple deletion interface with visual feedback
+        p.addUserDebugText("Delete tile by index:", [0, -0.8, 0], textColorRGB=[1, 0.3, 0.3], textSize=1.5)
+        self.ui_controls['delete_param'] = p.addUserDebugParameter("Index to delete", 0, len(self.simulation_data['bricks'])-1, 0)
+        self.ui_controls['delete_button'] = p.addUserDebugParameter("Execute deletion", 0, 1, 0)
+        
+        # Add toggle for tile labels visibility
+        self.ui_controls['label_toggle'] = p.addUserDebugParameter("Show/Hide Labels", 0, 1, 1 if self.labels_visible else 0)
+        
+        # Add performance control slider - update frequency for labels
+        self.ui_controls['update_freq'] = p.addUserDebugParameter("Label update frequency", 1, 30, self.update_frequency)
+        
+        # Add labels to all tiles at startup if enabled
+        if self.labels_visible:
+            self.add_labels_to_tiles()
+        
+        return self.ui_controls
         
     def _map_constraints_to_bodies(self):
         """Map constraints to the bodies they connect"""
@@ -73,137 +99,259 @@ class EventHandler:
             self.constraints_map[parent_id].append(constraint_id)
             self.constraints_map[child_id].append(constraint_id)
     
-    def handle_events(self):
+    def handle_ui_events(self):
         """
-        Handle keyboard and mouse events.
+        Handle UI control events and take appropriate actions.
         
         Returns:
-            bool: True if simulation should be reset, False otherwise
+            dict: Updated simulation data if reset was triggered, None otherwise
         """
-        keys = p.getKeyboardEvents()
-        mouse_events = p.getMouseEvents()
-        
-        # Handle keyboard events
-        for key, state in keys.items():
-            # Key pressed (state == 3) or Key held down (state == 1)
-            if state == 3:  
-                if key == ord('r'):
-                    print("Resetting simulation...")
-                    return True  # Signal to reset the simulation
-                
-                elif key == ord('v'):
-                    self._save_vertex_locations()
-                
-                elif key == ord('d'):
-                    self.delete_mode = not self.delete_mode
-                    mode_text = "enabled" if self.delete_mode else "disabled"
-                    print(f"Delete mode {mode_text}")
-        
-        # Handle mouse events
-        for event in mouse_events:
-            # Mouse button clicked
-            if event[0] == 2:  # Mouse button down event
-                # Check if we're in delete mode
-                if self.delete_mode:
-                    self._handle_brick_deletion(event)
+        # Handle reset control
+        current_reset = p.readUserDebugParameter(self.ui_controls['reset_param'])
+        if current_reset > 0.5 and self.last_reset_val <= 0.5:
+            print("Reset simulation requested")
+            # Clean up existing labels
+            self._remove_all_labels()
             
-        return False
-    
-    def _handle_brick_deletion(self, mouse_event):
-        """Handle deletion of a brick when clicked in delete mode"""
-        # Get the ray from mouse click
-        x, y = mouse_event[1], mouse_event[2]
-        ray_from, ray_to = self._get_ray_from_mouse(x, y)
+            # Reset the simulation
+            new_sim_data = self.reset_simulation()
+            self.last_reset_val = current_reset
+            return new_sim_data
+        self.last_reset_val = current_reset
         
-        # Perform ray test
-        results = p.rayTest(ray_from, ray_to)
+        # Handle save control
+        current_save = p.readUserDebugParameter(self.ui_controls['save_param'])
+        if current_save > 0.5 and self.last_save_val <= 0.5:
+            print("Save vertices requested")
+            self.save_vertex_locations()
+        self.last_save_val = current_save
         
-        if results[0][0] != -1:  # If the ray hit something
-            hit_object_id = results[0][0]
+        # Handle deletion control
+        current_delete_button_val = p.readUserDebugParameter(self.ui_controls['delete_button'])
+        if current_delete_button_val > 0.5 and self.last_delete_button_val <= 0.5:
+            delete_idx = int(p.readUserDebugParameter(self.ui_controls['delete_param']))
+            self.remove_brick_by_index(delete_idx)
             
-            # Check if the hit object is a brick
-            if hit_object_id in self.simulation_data['bricks']:
-                print(f"Deleting brick ID: {hit_object_id}")
-                self._remove_brick(hit_object_id)
+            # Reset the delete button
+            p.removeUserDebugItem(self.ui_controls['delete_button'])
+            self.ui_controls['delete_button'] = p.addUserDebugParameter("Execute deletion", 0, 1, 0)
+            self.last_delete_button_val = 0
+        else:
+            self.last_delete_button_val = current_delete_button_val
+            
+        # Handle label visibility toggle
+        current_label_toggle_val = p.readUserDebugParameter(self.ui_controls['label_toggle'])
+        if (current_label_toggle_val > 0.5 and self.last_label_toggle_val <= 0.5) or \
+           (current_label_toggle_val <= 0.5 and self.last_label_toggle_val > 0.5):
+            # Toggle changed state
+            self.labels_visible = not self.labels_visible
+            if self.labels_visible:
+                self.add_labels_to_tiles()
+            else:
+                self._remove_all_labels()
+        self.last_label_toggle_val = current_label_toggle_val
+        
+        # Handle update frequency adjustment
+        new_freq = int(p.readUserDebugParameter(self.ui_controls['update_freq']))
+        if new_freq != self.update_frequency:
+            self.update_frequency = new_freq
+        
+        return None
     
-    def _get_ray_from_mouse(self, x, y):
-        """Convert mouse coordinates to a ray in 3D space"""
-        # Get camera information - this returns (width, height, viewMatrix, projectionMatrix, cameraUp, cameraForward, ...)
-        cam_info = p.getDebugVisualizerCamera()
-        width, height = cam_info[0], cam_info[1]
-        view_matrix = np.array(cam_info[2]).reshape(4, 4, order='F')
-        proj_matrix = np.array(cam_info[3]).reshape(4, 4, order='F')
+    def reset_simulation(self):
+        """
+        Reset the simulation to its initial state.
         
-        # Get camera position from view matrix
-        camera_position = [view_matrix[0][3], view_matrix[1][3], view_matrix[2][3]]
+        Returns:
+            dict: Updated simulation data
+        """
+        # Make sure all labels are removed
+        self._remove_all_labels()
         
-        # Convert screen space coordinates to normalized device coordinates
-        ndc_x = (2.0 * x) / width - 1.0
-        ndc_y = 1.0 - (2.0 * y) / height
-        
-        # Calculate ray direction in clip space
-        ray_clip = np.array([ndc_x, ndc_y, -1.0, 1.0])
-        
-        # Calculate ray direction in eye space
-        inv_proj = np.linalg.inv(proj_matrix)
-        ray_eye = np.dot(inv_proj, ray_clip)
-        ray_eye = np.array([ray_eye[0], ray_eye[1], -1.0, 0.0])
-        
-        # Calculate ray direction in world space
-        inv_view = np.linalg.inv(view_matrix)
-        ray_world = np.dot(inv_view, ray_eye)
-        ray_direction = np.array([ray_world[0], ray_world[1], ray_world[2]])
-        ray_direction = ray_direction / np.linalg.norm(ray_direction)
-        
-        # Ray origin is the camera position
-        ray_from = camera_position
-        
-        # Ray end point is some distance along the ray
-        ray_to = [
-            ray_from[0] + ray_direction[0] * 1000.0,
-            ray_from[1] + ray_direction[1] * 1000.0,
-            ray_from[2] + ray_direction[2] * 1000.0
-        ]
-        
-        return ray_from, ray_to
-    
-    def _remove_brick(self, brick_id):
-        """Remove a brick and its constraints from the simulation"""
-        # First, remove all constraints involving this brick
-        constraints_to_remove = self.constraints_map.get(brick_id, [])
-        for constraint_id in constraints_to_remove:
+        # Clean up existing bodies
+        for b in self.simulation_data['bricks']:
             try:
-                p.removeConstraint(constraint_id)
+                p.removeBody(b)
             except:
-                pass  # Constraint might already be removed
+                pass
+        
+        # Give time for physics engine to process removals
+        for _ in range(20):
+            p.stepSimulation()
+            time.sleep(0.01)
+        
+        # Reinitialize with the original data
+        sim_data, force_tiles, force_function = self.simulation_functions['initialize_simulation']()
+        self.simulation_data = sim_data
+        
+        # Stabilize the new scene
+        print("Stabilizing reset simulation...")
+        for _ in range(50):
+            p.stepSimulation()
+            time.sleep(0.001)
+            
+        # Add labels to all tiles after reset if they were visible
+        if self.labels_visible:
+            self.add_labels_to_tiles()
+            
+        print("Reset completed")
+        return sim_data
+        
+    def add_labels_to_tiles(self):
+        """Add visible index labels to all tiles in the simulation"""
+        # Remove any existing labels first
+        self._remove_all_labels()
+        
+        # Create new labels for each brick
+        for idx, brick_id in enumerate(self.simulation_data['bricks']):
+            # Add text label (position will be updated in update_labels)
+            text_id = p.addUserDebugText(
+                str(idx),
+                [0, 0, 0],  # Initial position will be updated
+                textColorRGB=[1, 1, 0],  # Yellow text
+                textSize=1.5,
+                lifeTime=0  # Persistent until removed
+            )
+            self.tile_labels[brick_id] = text_id
+        
+        # Update positions immediately
+        self.update_labels()
+    
+    def update_labels(self):
+        """Update label positions to match current tile positions"""
+        if not self.tile_labels or not self.labels_visible:
+            return
+            
+        # Check if we should update based on the frequency
+        self.frame_counter += 1
+        if self.frame_counter % self.update_frequency != 0:
+            return
+            
+        # Get all positions and orientations at once for better performance
+        positions_and_orientations = {brick_id: p.getBasePositionAndOrientation(brick_id) 
+                                     for brick_id in self.tile_labels.keys() 
+                                     if brick_id in self.simulation_data['bricks']}
+        
+        # Update in batches for better performance
+        for brick_id, label_id in list(self.tile_labels.items()):
+            if brick_id in self.simulation_data['bricks']:
+                idx = self.simulation_data['bricks'].index(brick_id)
+                if idx < len(self.simulation_data['normals']):
+                    # Get cached position and orientation
+                    if brick_id in positions_and_orientations:
+                        pos, orn = positions_and_orientations[brick_id]
+                    else:
+                        continue
+                        
+                    normal = self.simulation_data['normals'][idx]
+                    
+                    # Apply current orientation to normal
+                    rot = p.getMatrixFromQuaternion(orn)
+                    rot_mat = np.array(rot).reshape(3, 3)
+                    rotated_normal = rot_mat.dot(np.array(normal))
+                    
+                    # Position the label slightly above the brick in the normal direction
+                    label_pos = [
+                        pos[0] + rotated_normal[0] * 0.05,
+                        pos[1] + rotated_normal[1] * 0.05,
+                        pos[2] + rotated_normal[2] * 0.05
+                    ]
+                    
+                    # Update label position
+                    p.addUserDebugText(
+                        str(idx),
+                        label_pos,
+                        textColorRGB=[1, 1, 0],
+                        textSize=1.5,
+                        lifeTime=0,
+                        replaceItemUniqueId=label_id
+                    )
+            else:
+                # If brick no longer exists, remove the label
+                p.removeUserDebugItem(label_id)
+                del self.tile_labels[brick_id]
+    
+    def _remove_all_labels(self):
+        """Remove all tile index labels"""
+        for label_id in self.tile_labels.values():
+            try:
+                p.removeUserDebugItem(label_id)
+            except:
+                pass
+        self.tile_labels = {}
+        
+    def remove_brick_by_index(self, index):
+        """
+        Remove a brick by its index in the bricks list.
+        
+        Args:
+            index: Index of brick to remove (0-based)
+            
+        Returns:
+            bool: True if brick was removed, False otherwise
+        """
+        # Validate index range
+        if index < 0 or index >= len(self.simulation_data['bricks']):
+            print(f"Invalid brick index: {index}. Valid range: 0-{len(self.simulation_data['bricks'])-1}")
+            return False
+            
+        # Get the correct brick ID at the specified index
+        brick_id = self.simulation_data['bricks'][index]
+        print(f"Deleting brick at index {index}")
+        
+        # First, find and remove all constraints involving this brick
+        constraints_to_remove = []
+        for c in range(p.getNumConstraints()):
+            try:
+                constraint_info = p.getConstraintInfo(c)
+                if constraint_info[2] == brick_id or constraint_info[3] == brick_id:
+                    constraints_to_remove.append(c)
+            except Exception as e:
+                continue
+                
+        # Remove constraints (in reverse order to avoid index issues)
+        for c in reversed(constraints_to_remove):
+            try:
+                p.removeConstraint(c)
+            except:
+                pass
         
         # Remove the brick from the simulation
         try:
             p.removeBody(brick_id)
         except:
-            pass  # Body might already be removed
+            pass
         
-        # Update simulation data
-        if brick_id in self.simulation_data['bricks']:
-            idx = self.simulation_data['bricks'].index(brick_id)
-            self.simulation_data['bricks'].remove(brick_id)
-            if idx < len(self.simulation_data['normals']):
-                self.simulation_data['normals'].pop(idx)
+        # Update simulation data structures
+        self.simulation_data['bricks'].pop(index)
+        
+        if index < len(self.simulation_data['normals']):
+            self.simulation_data['normals'].pop(index)
+        
+        if 'local_top_vertices' in self.simulation_data and index < len(self.simulation_data['local_top_vertices']):
+            self.simulation_data['local_top_vertices'].pop(index)
         
         # Update constraints map
         if brick_id in self.constraints_map:
             del self.constraints_map[brick_id]
         
-        # Rebuild constraints map - constraints may have been removed
-        # that affect other bodies
+        # Rebuild constraints map
         self.constraints_map = {}
         self._map_constraints_to_bodies()
+        
         # Step a few frames so the GUI refreshes without waiting for the main loop
         for _ in range(10):
             p.stepSimulation()
             time.sleep(0.001)
+        
+        # Update tile labels to reflect the new indices
+        if self.labels_visible:
+            self._remove_all_labels()
+            self.add_labels_to_tiles()
+            
+        return True
     
-    def _save_vertex_locations(self):
+    def save_vertex_locations(self):
         """Save current vertex locations to a file for MATLAB processing"""
         try:
             # Create a filename with timestamp
@@ -239,5 +387,37 @@ class EventHandler:
                     f.write(line + "\n")
             
             print(f"Saved vertex data to {output_file}")
+            return True
         except Exception as e:
             print(f"Error saving vertex data: {e}")
+            return False
+            
+    def step_simulation(self):
+        """Run one step of the simulation with forces"""
+        # Skip if there are no bricks
+        if not self.simulation_data['bricks']:
+            p.stepSimulation()
+            return
+            
+        # Calculate the center of the structure
+        # Sample only every nth brick for performance with large structures
+        num_bricks = len(self.simulation_data['bricks'])
+        sampling_rate = max(1, num_bricks // 100)  # Limit to ~100 samples max
+        sampled_bricks = self.simulation_data['bricks'][::sampling_rate]
+        
+        # Get positions efficiently in batch
+        sampled_positions = [p.getBasePositionAndOrientation(brick_id)[0] 
+                           for brick_id in sampled_bricks]
+        whole_center = np.mean(sampled_positions, axis=0)
+        
+        # Apply forces using the provided function
+        # Only apply forces every few steps for large simulations
+        if num_bricks < 100 or self.frame_counter % 2 == 0:
+            self.simulation_functions['apply_forces'](whole_center)
+        
+        # Step simulation
+        p.stepSimulation()
+        
+        # Update label positions if visible
+        if self.labels_visible:
+            self.update_labels()

@@ -4,40 +4,44 @@ Geometry utilities for the kirigami simulation project.
 import numpy as np
 import pybullet as p
 
-def create_3d_brick(vertices_flat, brick_thickness, normal_correction=1):
+def create_3d_brick(vertices_flat, brick_thickness):
     """
     Create a 3D brick from 3D quad vertices.
     
     Args:
         vertices_flat: Flattened array of 3D vertices (12 values: 4 vertices with x,y,z)
         brick_thickness: Thickness of the brick
-        normal_correction: Factor to correct normal direction (1 or -1)
         
     Returns:
-        tuple: (vertices list for PyBullet, indices, center position, top vertices, normal)
+        tuple: (vertices list for PyBullet, indices, center position, bottom vertices, top vertices, normal)
     """
-    half_thickness = brick_thickness / 2
-    quad_vertices_3d = vertices_flat.reshape(4, 3)
-    center = np.mean(quad_vertices_3d, axis=0)
+    # Reshape to get the four vertices of the quad
+    quad_vertices = vertices_flat.reshape(4, 3)
+    
+    # Use original vertices as bottom vertices
+    bottom_vertices = quad_vertices.copy()
+    
+    # Calculate the center point for centering in PyBullet
+    center = np.mean(quad_vertices, axis=0)
     
     # Calculate normal
-    vec1 = quad_vertices_3d[1] - quad_vertices_3d[0]
-    vec2 = quad_vertices_3d[3] - quad_vertices_3d[0]
+    vec1 = quad_vertices[1] - quad_vertices[0]
+    vec2 = quad_vertices[3] - quad_vertices[0]
     normal = np.cross(vec1, vec2)
     normal = normal / np.linalg.norm(normal)
-    normal = normal * normal_correction
     
-    # Create vertices
-    bottom_vertices = quad_vertices_3d - half_thickness * normal
-    top_vertices_3d = quad_vertices_3d + half_thickness * normal
+    # Create top vertices by adding thickness along normal
+    top_vertices = quad_vertices + brick_thickness * normal
     
+    # For PyBullet, we need to center the vertices around (0,0,0)
+    # and then position the rigid body at the original center
     verts = []
     for v in bottom_vertices:
         verts.append((v - center).tolist())
-    for v in top_vertices_3d:
+    for v in top_vertices:
         verts.append((v - center).tolist())
     
-    # Create face indices
+    # Create face indices (unchanged)
     indices = [
         [0, 1, 2], [0, 2, 3],  # Bottom face
         [4, 5, 6], [4, 6, 7],  # Top face
@@ -48,7 +52,7 @@ def create_3d_brick(vertices_flat, brick_thickness, normal_correction=1):
     ]
     flat_indices = [idx for sublist in indices for idx in sublist]
     
-    return verts, flat_indices, center.tolist(), top_vertices_3d.tolist(), normal.tolist()
+    return verts, flat_indices, center.tolist(), bottom_vertices.tolist(), top_vertices.tolist(), normal.tolist()
 
 def create_brick_body(verts, indices, center, mass=1.0):
     """
@@ -89,31 +93,61 @@ def create_point_constraint(body_id1, body_id2, pivot_in_body1, pivot_in_body2):
         pivot_in_body1, pivot_in_body2
     )
 
-def create_constraints_between_bricks(bricks, constraints, top_vertices, brick_centers):
+def create_constraints_between_bricks(bricks, constraints, bottom_vertices, top_vertices, brick_centers, connection_mode='bottom'):
     """Create constraints between bricks based on vertex connections.
     
     Args:
         bricks: List of brick body IDs
         constraints: List of constraints (f_i, v_j, f_p, v_q)
+        bottom_vertices: List of bottom vertices for each brick
         top_vertices: List of top vertices for each brick
         brick_centers: List of brick center positions
+        connection_mode: Which vertices to connect ('bottom', 'top', 'both')
+                        - 'bottom': Connect original vertices (good for 3D space simulations)
+                        - 'top': Connect only top vertices
+                        - 'both': Connect both bottom and top (best for planar stability)
+        
+    Returns:
+        list: List of created constraint IDs
     """
+    created_constraints = []
+    
     for f_i, v_j, f_p, v_q in constraints:
         # Skip invalid constraints
         if (f_i >= len(bricks) or f_p >= len(bricks) or 
             v_j >= 4 or v_q >= 4):
             print(f"Warning: Skipping invalid constraint: {(f_i, v_j, f_p, v_q)}")
             continue
-        
-        # Get vertices and centers
-        vertex_i_global = top_vertices[f_i][v_j]
-        vertex_p_global = top_vertices[f_p][v_q]
+            
+        # Get centers
         center_i = brick_centers[f_i]
         center_p = brick_centers[f_p]
         
-        # Calculate pivot points in local coordinates
-        pivot_in_i = [vertex_i_global[k] - center_i[k] for k in range(3)]
-        pivot_in_p = [vertex_p_global[k] - center_p[k] for k in range(3)]
-        
-        # Create constraint
-        create_point_constraint(bricks[f_i], bricks[f_p], pivot_in_i, pivot_in_p)
+        # Connect based on connection mode
+        if connection_mode in ('bottom', 'both'):
+            # Connect bottom vertices
+            vertex_i_global = bottom_vertices[f_i][v_j]
+            vertex_p_global = bottom_vertices[f_p][v_q]
+            
+            # Calculate pivot points in local coordinates
+            pivot_in_i = [vertex_i_global[k] - center_i[k] for k in range(3)]
+            pivot_in_p = [vertex_p_global[k] - center_p[k] for k in range(3)]
+            
+            # Create constraint
+            c_id = create_point_constraint(bricks[f_i], bricks[f_p], pivot_in_i, pivot_in_p)
+            created_constraints.append(c_id)
+            
+        if connection_mode in ('top', 'both'):
+            # Connect top vertices
+            vertex_i_global_top = top_vertices[f_i][v_j]
+            vertex_p_global_top = top_vertices[f_p][v_q]
+            
+            # Calculate pivot points in local coordinates
+            pivot_in_i_top = [vertex_i_global_top[k] - center_i[k] for k in range(3)]
+            pivot_in_p_top = [vertex_p_global_top[k] - center_p[k] for k in range(3)]
+            
+            # Create constraint
+            c_id = create_point_constraint(bricks[f_i], bricks[f_p], pivot_in_i_top, pivot_in_p_top)
+            created_constraints.append(c_id)
+    
+    return created_constraints

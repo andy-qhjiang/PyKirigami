@@ -97,7 +97,7 @@ def stabilize_object(object_id, linear_damping=25, angular_damping=25):
 
 def parse_arguments():
     """Parse command-line arguments"""
-    parser = argparse.ArgumentParser(description='Kirigami_simulation_3D with PyBullet')
+    parser = argparse.ArgumentParser(description='Unified Kirigami Simulation')
     
     # File paths
     parser.add_argument('--vertices_file', type=str, required=True,
@@ -109,7 +109,7 @@ def parse_arguments():
     
     # Force parameters
     parser.add_argument('--force_type', type=str, default='vertical',
-                      choices=['normal', 'outward'],
+                      choices=['vertical', 'normal', 'outward'],
                       help='Type of force to apply')
     parser.add_argument('--force_magnitude', type=float, default=DEFAULT_FORCE_MAGNITUDE,
                       help=f'Magnitude of applied forces (default: {DEFAULT_FORCE_MAGNITUDE})')
@@ -119,10 +119,8 @@ def parse_arguments():
     # Brick parameters
     parser.add_argument('--brick_thickness', type=float, default=DEFAULT_BRICK_THICKNESS,
                       help=f'Thickness of bricks (default: {DEFAULT_BRICK_THICKNESS})')
-    
-    parser.add_argument('--ground_plane', action='store_true',
-                      help='Add ground plane')
-    
+    parser.add_argument('--connection_mode', type=str, choices=['bottom', 'top', 'both'], default='bottom',
+                      help='How to connect bricks: bottom vertices (default, best for 3D), top vertices, or both (best for planar stability)')
     
     # Physics parameters
     parser.add_argument('--gravity', type=float, default=-9.81,
@@ -139,7 +137,13 @@ def parse_arguments():
                       help='Physics substeps')
     parser.add_argument('--sim_steps', type=int, default=2400,
                       help='Number of simulation steps')
+    parser.add_argument('--ground_plane', action='store_true',
+                      help='Add ground plane')
     parser.add_argument('--keep_open', action='store_true',
                       help='Keep window open after simulation')
+    parser.add_argument('--no-labels', action='store_true',
+                      help='Disable tile index labels for better performance')
+    parser.add_argument('--performance-mode', action='store_true',
+                      help='Enable all performance optimizations (equivalent to --no-labels)')
     
     return parser.parse_args()
