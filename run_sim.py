@@ -10,7 +10,12 @@ Note: This script expects 3D vertex data (12 values per line: x,y,z for 4 vertic
       For 2D data, users must preprocess files by adding z=0 to each point.
 
 Usage:
-    python run_sim.py --vertices_file [file] --constraints_file [file] --force_type [type]
+    python run_sim.py --vertices_file rigid_3by3_pattern_contracted_vertices.txt --constraints_file rigid_3by3_constraints.txt 
+    --hull_file rigid_3by3_hull.txt --force_type outward --connection_mode both --ground_plane --brick_thickness 0.2 --gravity -50 --force_magnitude 100
+
+
+    python run_sim.py --vertices_file cube2sphere_contracted_vertices.txt --constraints_file cube2sphere_constraints.txt
+    --force_type normal  --force_magnitude 500 
 """
 import os
 import sys
