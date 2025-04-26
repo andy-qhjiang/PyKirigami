@@ -108,9 +108,12 @@ def create_constraints_between_bricks(bricks, constraints, bottom_vertices, top_
                         - 'both': Connect both bottom and top (best for planar stability)
         
     Returns:
-        list: List of created constraint IDs
+        tuple: (created_constraint_ids, constraint_mapping)
+            - created_constraint_ids: List of created constraint IDs
+            - constraint_mapping: List of (constraint_id, tile_idx1, tile_idx2) tuples
     """
     created_constraints = []
+    constraint_mapping = []
     
     for f_i, v_j, f_p, v_q in constraints:
         # Skip invalid constraints
@@ -137,6 +140,9 @@ def create_constraints_between_bricks(bricks, constraints, bottom_vertices, top_
             c_id = create_point_constraint(bricks[f_i], bricks[f_p], pivot_in_i, pivot_in_p)
             created_constraints.append(c_id)
             
+            # Store constraint mapping for easy lookup
+            constraint_mapping.append((c_id, f_i, f_p))
+            
         if connection_mode in ('top', 'both'):
             # Connect top vertices
             vertex_i_global_top = top_vertices[f_i][v_j]
@@ -149,5 +155,8 @@ def create_constraints_between_bricks(bricks, constraints, bottom_vertices, top_
             # Create constraint
             c_id = create_point_constraint(bricks[f_i], bricks[f_p], pivot_in_i_top, pivot_in_p_top)
             created_constraints.append(c_id)
+            
+            # Store constraint mapping for easy lookup
+            constraint_mapping.append((c_id, f_i, f_p))
     
-    return created_constraints
+    return created_constraints, constraint_mapping

@@ -130,7 +130,9 @@ def run_simulation(args):
         
         # Create constraints between bricks
         connection_mode = 'bottom' if args.connection_mode is None else args.connection_mode
-        create_constraints_between_bricks(local_bricks, constraints, bottom_vertices, top_vertices, brick_centers, connection_mode)
+        constraint_ids, constraint_mapping = create_constraints_between_bricks(
+            local_bricks, constraints, bottom_vertices, top_vertices, brick_centers, connection_mode
+        )
         
         # Prepare simulation data for event handler
         sim_data = {
@@ -151,6 +153,8 @@ def run_simulation(args):
                 [v[k] - center[k] for k in range(3)]
                 for v in tile_top_vertices
             ] for tile_top_vertices, center in zip(top_vertices, brick_centers)],
+            'constraint_ids': constraint_ids,
+            'constraint_mapping': constraint_mapping,
             'original_data': original_sim_data
         }
         
@@ -206,7 +210,9 @@ def run_simulation(args):
     print("Controls available through GUI sliders:")
     print("  - Reset: Drag 'Reset simulation' slider above 0.5")
     print("  - Save: Drag 'Save vertices' slider above 0.5")
-    print("  - Delete: Enter the tile index shown on the tile, then press the delete button")
+    print("  - Constraints: Remove constraints between tiles by specifying their indices")
+    print("  - Show/Hide Constraints List: Toggle list of constraint IDs and connected tiles")
+    print("  - Remove By ID: Remove a specific constraint by its ID")
     print("  - Show/Hide Labels: Toggle tile index labels visibility")
     print("  - Label update frequency: Control how often labels are updated")
     
@@ -215,6 +221,9 @@ def run_simulation(args):
     if num_bricks > 100 and show_labels:
         print(f"\nPerformance tip: Your simulation has {num_bricks} tiles.")
         print("For better performance with large simulations, use --no-labels or --performance-mode")
+    
+    print("\nTIP: To effectively 'delete' a tile, remove all constraints connected to it.")
+    print("When a tile has no constraints, it becomes free and can be moved separately.")
     
     # Set up UI controls
     event_handler.setup_ui_controls()
