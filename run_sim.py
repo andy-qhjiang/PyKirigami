@@ -32,6 +32,7 @@ from utils.setup import (parse_arguments, setup_physics_engine, create_ground_pl
 from simulation.geometry import (create_3d_brick, create_brick_body, create_constraints_between_bricks)
 from simulation.forces import get_force_direction_function, apply_force_to_bodies
 from simulation.event_handler import EventHandler
+from utils.qt_controls import launch_qt_controls
 
 
 def run_simulation(args):
@@ -228,6 +229,9 @@ def run_simulation(args):
     # Set up UI controls
     event_handler.setup_ui_controls()
     
+    # Launch Qt control panel
+    qt_app, qt_control_panel = launch_qt_controls(sim_data, event_handler)
+    
     # Main simulation loop
     try:
         while p.isConnected():
@@ -239,6 +243,9 @@ def run_simulation(args):
             
             # Step the simulation (includes force application and label updates)
             event_handler.step_simulation()
+            
+            # Process Qt events to keep the UI responsive
+            qt_app.processEvents()
             
             # Pause to maintain frame rate
             time.sleep(args.timestep)

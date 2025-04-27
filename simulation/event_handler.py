@@ -34,6 +34,10 @@ class EventHandler:
         self.update_frequency = 5  # Only update labels every N frames for performance
         self.frame_counter = 0
         
+        # Initialize tile index values
+        self.tile1_index = 0
+        self.tile2_index = 1
+        
         # State tracking for edge detection
         self.last_reset_val = 0
         self.last_save_val = 0
@@ -56,7 +60,6 @@ class EventHandler:
         self.ui_controls['save_param'] = p.addUserDebugParameter("Save vertices", 0, 1, 0)
         
         # Constraint removal interface
-        p.addUserDebugText("Remove constraint between tiles:", [0, -0.8, 0], textColorRGB=[1, 0.3, 0.3], textSize=1.5)
         self.ui_controls['tile1_param'] = p.addUserDebugParameter("Tile 1 Index", 0, len(self.simulation_data['bricks'])-1, 0)
         self.ui_controls['tile2_param'] = p.addUserDebugParameter("Tile 2 Index", 0, len(self.simulation_data['bricks'])-1, 1)
         self.ui_controls['remove_constraint_button'] = p.addUserDebugParameter("Remove Constraint", 0, 1, 0)
@@ -301,11 +304,20 @@ class EventHandler:
         
         # Loop through constraint mapping and identify constraints between the specified tiles
         for i, constraint_data in enumerate(self.constraint_mapping):
-            constraint_id, t1_idx, t2_idx = constraint_data
-            
-            # Match by actual indices, not by brick IDs
-            if (t1_idx == tile1_idx and t2_idx == tile2_idx) or (t1_idx == tile2_idx and t2_idx == tile1_idx):
-                constraints_to_remove.append((i, constraint_id))
+            # Safety check for constraint data format
+            if not isinstance(constraint_data, (list, tuple)) or len(constraint_data) < 3:
+                print(f"Warning: Invalid constraint data format at index {i}: {constraint_data}")
+                continue
+                
+            try:
+                constraint_id, t1_idx, t2_idx = constraint_data
+                
+                # Match by actual indices, not by brick IDs
+                if (t1_idx == tile1_idx and t2_idx == tile2_idx) or (t1_idx == tile2_idx and t2_idx == tile1_idx):
+                    constraints_to_remove.append((i, constraint_id))
+            except (ValueError, TypeError) as e:
+                print(f"Error processing constraint data at index {i}: {e}")
+                continue
         
         # Remove constraints in reverse order to keep indices valid
         for idx_to_remove, constraint_id in sorted(constraints_to_remove, reverse=True):
