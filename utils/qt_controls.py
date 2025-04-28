@@ -103,6 +103,23 @@ class KirigamiControlPanel(QMainWindow):
         self.toggle_labels_button = QPushButton("Toggle Labels")
         sim_control_layout.addWidget(self.toggle_labels_button)
         
+        # Label update frequency control
+        freq_layout = QHBoxLayout()
+        self.freq_label = QLabel("Label Update Frequency:")
+        self.freq_slider = QSlider(Qt.Horizontal)
+        self.freq_slider.setMinimum(1)
+        self.freq_slider.setMaximum(30)
+        self.freq_slider.setValue(5)  # Default value
+        self.freq_spinbox = QSpinBox()
+        self.freq_spinbox.setMinimum(1)
+        self.freq_spinbox.setMaximum(30)
+        self.freq_spinbox.setValue(5)  # Default value
+        
+        freq_layout.addWidget(self.freq_label)
+        freq_layout.addWidget(self.freq_slider)
+        freq_layout.addWidget(self.freq_spinbox)
+        sim_control_layout.addLayout(freq_layout)
+        
         # Set the layout for the simulation control group
         sim_control_group.setLayout(sim_control_layout)
         
@@ -112,9 +129,9 @@ class KirigamiControlPanel(QMainWindow):
         # Set up connections between controls
         self.setup_connections()
         
-        # Set up timer to sync with PyBullet parameters
+        # Set up timer to sync with simulation data
         self.sync_timer = QTimer(self)
-        self.sync_timer.timeout.connect(self.sync_with_pybullet)
+        self.sync_timer.timeout.connect(self.sync_with_simulation)
         self.sync_timer.start(100)  # Update 10 times per second
         
         # Show the window
@@ -132,6 +149,11 @@ class KirigamiControlPanel(QMainWindow):
         self.tile2_spinbox.valueChanged.connect(self.tile2_slider.setValue)
         self.tile2_spinbox.valueChanged.connect(self.update_pybullet_tile2)
         
+        # Connect label update frequency controls
+        self.freq_slider.valueChanged.connect(self.freq_spinbox.setValue)
+        self.freq_spinbox.valueChanged.connect(self.freq_slider.setValue)
+        self.freq_spinbox.valueChanged.connect(self.update_label_frequency)
+        
         # Connect buttons
         self.remove_constraint_button.clicked.connect(self.remove_constraint)
         self.reset_button.clicked.connect(self.reset_simulation)
@@ -140,71 +162,54 @@ class KirigamiControlPanel(QMainWindow):
     
     def update_pybullet_tile1(self, value):
         """Update the tile1 index value in the event handler"""
-        if hasattr(self.event_handler, 'ui_controls'):
-            # Store the value directly in the event handler
-            self.event_handler.tile1_index = value
+        self.event_handler.tile1_index = value
     
     def update_pybullet_tile2(self, value):
         """Update the tile2 index value in the event handler"""
-        if hasattr(self.event_handler, 'ui_controls'):
-            # Store the value directly in the event handler
-            self.event_handler.tile2_index = value
+        self.event_handler.tile2_index = value
     
-    def sync_with_pybullet(self):
-        """Sync PyQt controls with PyBullet parameters"""
-        # Check if the PyBullet controls have been updated
-        if hasattr(self.event_handler, 'ui_controls'):
-            # Update slider maximums if number of bricks has changed
-            if self.tile1_slider.maximum() != len(self.simulation_data['bricks'])-1:
-                new_max = len(self.simulation_data['bricks'])-1
-                self.tile1_slider.setMaximum(new_max)
-                self.tile1_spinbox.setMaximum(new_max)
-                self.tile2_slider.setMaximum(new_max)
-                self.tile2_spinbox.setMaximum(new_max)
+    def update_label_frequency(self, value):
+        """Update the label update frequency in the label manager"""
+        if hasattr(self.event_handler, 'label_manager'):
+            self.event_handler.label_manager.set_update_frequency(value)
+    
+    def sync_with_simulation(self):
+        """Sync PyQt controls with current simulation state"""
+        # Update slider maximums if number of bricks has changed
+        if self.tile1_slider.maximum() != len(self.simulation_data['bricks'])-1:
+            new_max = len(self.simulation_data['bricks'])-1
+            self.tile1_slider.setMaximum(new_max)
+            self.tile1_spinbox.setMaximum(new_max)
+            self.tile2_slider.setMaximum(new_max)
+            self.tile2_spinbox.setMaximum(new_max)
+            
+        # Update frequency slider to match the actual value
+        if hasattr(self.event_handler, 'label_manager'):
+            current_freq = self.event_handler.label_manager.update_frequency
+            if current_freq != self.freq_slider.value():
+                self.freq_slider.setValue(current_freq)
+                self.freq_spinbox.setValue(current_freq)
     
     def remove_constraint(self):
-        """Trigger constraint removal in PyBullet"""
+        """Trigger constraint removal"""
         # Use tile indices directly from the spinboxes
         tile1_idx = self.tile1_spinbox.value()
         tile2_idx = self.tile2_spinbox.value()
         
         # Call the event handler's method to remove constraint
-        if hasattr(self.event_handler, 'remove_constraint_between_tiles'):
-            self.event_handler.remove_constraint_between_tiles(tile1_idx, tile2_idx)
+        self.event_handler.remove_constraint_between_tiles(tile1_idx, tile2_idx)
     
     def reset_simulation(self):
-        """Trigger simulation reset in PyBullet"""
-        # Use the existing reset mechanism in the event handler
-        if hasattr(self.event_handler, 'ui_controls'):
-            # Call the reset method directly if available
-            if hasattr(self.event_handler, 'reset_simulation'):
-                self.event_handler.reset_simulation()
-            else:
-                # Otherwise set a flag that will be checked during simulation steps
-                self.event_handler.reset_triggered = True
+        """Trigger simulation reset"""
+        self.event_handler.reset_simulation()
     
     def save_vertices(self):
-        """Trigger vertex saving in PyBullet"""
-        # Call the save method directly if available
-        if hasattr(self.event_handler, 'save_vertex_locations'):
-            self.event_handler.save_vertex_locations()
-        # Otherwise set a flag that will be checked during simulation steps
-        elif hasattr(self.event_handler, 'ui_controls'):
-            self.event_handler.save_vertices_triggered = True
+        """Trigger vertex saving"""
+        self.event_handler.save_vertex_locations()
     
     def toggle_labels(self):
-        """Toggle tile labels visibility in PyBullet"""
-        # Toggle the label visibility in the event handler
-        if hasattr(self.event_handler, 'labels_visible'):
-            self.event_handler.labels_visible = not self.event_handler.labels_visible
-            
-            # Update labels based on new visibility setting
-            if self.event_handler.labels_visible:
-                self.event_handler.add_labels_to_tiles()
-            else:
-                # Call the method to remove all labels if available
-                if hasattr(self.event_handler, '_remove_all_labels'):
-                    self.event_handler._remove_all_labels()
+        """Toggle tile labels visibility"""
+        self.event_handler.labels_visible = not self.event_handler.labels_visible
 
 def launch_qt_controls(simulation_data, event_handler):
     """
@@ -218,7 +223,7 @@ def launch_qt_controls(simulation_data, event_handler):
         event_handler: The event handler instance from the PyBullet simulation
     
     Returns:
-        The QApplication instance for the PyQt5 app
+        The QApplication instance and the control panel instance
     """
     # Create Qt application if it doesn't exist
     app = QApplication.instance()

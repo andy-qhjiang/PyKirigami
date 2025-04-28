@@ -1,12 +1,12 @@
 """
 Event handler for interactive kirigami simulation.
 
-This module provides a comprehensive handler for the kirigami simulation interactive controls
-through the PyBullet GUI, including:
-- Reset simulation
-- Save vertex data
-- Delete tiles
-- Display and update tile labels
+This module provides a comprehensive handler for the kirigami simulation interactive controls,
+with responsibilities split into focused components:
+- EventHandler: Main coordinator and entry point
+- LabelManager: Handles the tile labels display and updates
+- ConstraintManager: Manages the physics constraints between tiles
+- SimulationController: Handles high-level simulation operations (reset, save)
 """
 import os
 import time
@@ -14,198 +14,36 @@ import numpy as np
 import pybullet as p
 from datetime import datetime
 
-class EventHandler:
-    def __init__(self, simulation_data, simulation_functions, show_labels=True):
+class LabelManager:
+    """Handles the creation, updating, and removal of tile labels in the simulation."""
+    
+    def __init__(self, simulation_data, visible=True, update_frequency=5):
         """
-        Initialize the event handler with simulation data.
+        Initialize the label manager.
         
         Args:
             simulation_data: Dictionary containing simulation data
-            simulation_functions: Dictionary containing functions for simulation control:
-                - initialize_simulation: Function to reinitialize the simulation
-                - apply_forces: Function to apply forces to tiles
-            show_labels: Whether to show tile index labels (default: True)
+            visible: Whether labels should be visible initially
+            update_frequency: How often to update label positions (every N frames)
         """
         self.simulation_data = simulation_data
-        self.simulation_functions = simulation_functions
-        self.tile_labels = {}      # Maps brick_id to its text label ID
-        self.ui_controls = {}      # Stores UI control IDs
-        self.labels_visible = show_labels
-        self.update_frequency = 5  # Only update labels every N frames for performance
+        self.labels_visible = visible
+        self.tile_labels = {}  # Maps brick_id to its text label ID
+        self.update_frequency = update_frequency
         self.frame_counter = 0
         
-        # Initialize tile index values
-        self.tile1_index = 0
-        self.tile2_index = 1
-        
-        # State tracking for edge detection
-        self.last_reset_val = 0
-        self.last_save_val = 0
-        self.last_constraint_removal_val = 0
-        self.last_label_toggle_val = 1 if show_labels else 0
-        
-        # Initialize constraint mapping if it exists in simulation_data
-        if 'constraint_mapping' in simulation_data:
-            self.constraint_mapping = simulation_data['constraint_mapping']
-        else:
-            # For backward compatibility, create an empty mapping
-            self.constraint_mapping = []
-            # Map constraints
-            self._map_constraints_to_bodies()
-    
-    def setup_ui_controls(self):
-        """Set up UI controls for interactive simulation"""
-        # Create debug controls
-        self.ui_controls['reset_param'] = p.addUserDebugParameter("Reset simulation", 0, 1, 0)
-        self.ui_controls['save_param'] = p.addUserDebugParameter("Save vertices", 0, 1, 0)
-        
-        # Constraint removal interface
-        self.ui_controls['tile1_param'] = p.addUserDebugParameter("Tile 1 Index", 0, len(self.simulation_data['bricks'])-1, 0)
-        self.ui_controls['tile2_param'] = p.addUserDebugParameter("Tile 2 Index", 0, len(self.simulation_data['bricks'])-1, 1)
-        self.ui_controls['remove_constraint_button'] = p.addUserDebugParameter("Remove Constraint", 0, 1, 0)
-        
-        # Add toggle for tile labels visibility
-        self.ui_controls['label_toggle'] = p.addUserDebugParameter("Show/Hide Labels", 0, 1, 1 if self.labels_visible else 0)
-        
-        # Add performance control slider - update frequency for labels
-        self.ui_controls['update_freq'] = p.addUserDebugParameter("Label update frequency", 1, 30, self.update_frequency)
-        
-        # Add labels to all tiles at startup if enabled
-        if self.labels_visible:
+        # Create labels initially if they should be visible
+        if visible:
             self.add_labels_to_tiles()
-        
-        return self.ui_controls
-        
-    def _map_constraints_to_bodies(self):
-        """Map constraints to the bodies they connect for simulations not using the constraint mapping"""
-        # Get all constraints in the simulation
-        num_constraints = p.getNumConstraints()
-        
-        if num_constraints == 0:
-            # No constraints to map
-            return
-            
-        # Store constraint IDs with validation
-        for i in range(num_constraints):
-            try:
-                constraint_info = p.getConstraintInfo(i)
-                parent_id = constraint_info[2]
-                child_id = constraint_info[3]
-                
-                # Try to find the tile indices for these IDs
-                if parent_id in self.simulation_data['bricks'] and child_id in self.simulation_data['bricks']:
-                    parent_idx = self.simulation_data['bricks'].index(parent_id)
-                    child_idx = self.simulation_data['bricks'].index(child_id)
-                    self.constraint_mapping.append((i, parent_idx, child_idx))
-            except Exception as e:
-                # Skip invalid constraints
-                continue
     
-    def handle_ui_events(self):
-        """
-        Handle UI control events and take appropriate actions.
-        
-        Returns:
-            dict: Updated simulation data if reset was triggered, None otherwise
-        """
-        # Handle reset control
-        current_reset = p.readUserDebugParameter(self.ui_controls['reset_param'])
-        if current_reset > 0.5 and self.last_reset_val <= 0.5:
-            print("Reset simulation requested")
-            # Clean up existing labels
-            self._remove_all_labels()
-            
-            # Reset the simulation
-            new_sim_data = self.reset_simulation()
-            self.last_reset_val = current_reset
-            return new_sim_data
-        self.last_reset_val = current_reset
-        
-        # Handle save control
-        current_save = p.readUserDebugParameter(self.ui_controls['save_param'])
-        if current_save > 0.5 and self.last_save_val <= 0.5:
-            print("Save vertices requested")
-            self.save_vertex_locations()
-        self.last_save_val = current_save
-        
-        # Handle constraint removal between two tiles
-        current_remove_val = p.readUserDebugParameter(self.ui_controls['remove_constraint_button'])
-        if current_remove_val > 0.5 and self.last_constraint_removal_val <= 0.5:
-            tile1_idx = int(p.readUserDebugParameter(self.ui_controls['tile1_param']))
-            tile2_idx = int(p.readUserDebugParameter(self.ui_controls['tile2_param']))
-            self.remove_constraint_between_tiles(tile1_idx, tile2_idx)
-            
-            # Reset the button
-            p.removeUserDebugItem(self.ui_controls['remove_constraint_button'])
-            self.ui_controls['remove_constraint_button'] = p.addUserDebugParameter("Remove Constraint", 0, 1, 0)
-        self.last_constraint_removal_val = current_remove_val
-        
-        # Handle label visibility toggle
-        current_label_toggle_val = p.readUserDebugParameter(self.ui_controls['label_toggle'])
-        if (current_label_toggle_val > 0.5 and self.last_label_toggle_val <= 0.5) or \
-           (current_label_toggle_val <= 0.5 and self.last_label_toggle_val > 0.5):
-            # Toggle changed state
-            self.labels_visible = not self.labels_visible
-            if self.labels_visible:
-                self.add_labels_to_tiles()
-            else:
-                self._remove_all_labels()
-        self.last_label_toggle_val = current_label_toggle_val
-        
-        # Handle update frequency adjustment
-        new_freq = int(p.readUserDebugParameter(self.ui_controls['update_freq']))
-        if new_freq != self.update_frequency:
-            self.update_frequency = new_freq
-        
-        return None
-    
-    def reset_simulation(self):
-        """
-        Reset the simulation to its initial state.
-        
-        Returns:
-            dict: Updated simulation data
-        """
-        # Make sure all labels are removed
-        self._remove_all_labels()
-        
-        # Clean up existing bodies
-        for b in self.simulation_data['bricks']:
-            try:
-                p.removeBody(b)
-            except:
-                pass
-        
-        # Give time for physics engine to process removals
-        for _ in range(20):
-            p.stepSimulation()
-            time.sleep(0.01)
-        
-        # Reinitialize with the original data
-        sim_data, force_tiles, force_function = self.simulation_functions['initialize_simulation']()
-        self.simulation_data = sim_data
-        
-        # Stabilize the new scene
-        print("Stabilizing reset simulation...")
-        for _ in range(50):
-            p.stepSimulation()
-            time.sleep(0.001)
-            
-        # Add labels to all tiles after reset if they were visible
-        if self.labels_visible:
-            self.add_labels_to_tiles()
-            
-        print("Reset completed")
-        return sim_data
-        
     def add_labels_to_tiles(self):
         """Add visible index labels to all tiles in the simulation"""
         # Remove any existing labels first
-        self._remove_all_labels()
+        self.remove_all_labels()
         
         # Create new labels for each brick
         for idx, brick_id in enumerate(self.simulation_data['bricks']):
-            # Add text label (position will be updated in update_labels)
+            # Add text label (position will be updated later)
             text_id = p.addUserDebugText(
                 str(idx),
                 [0, 0, 0],  # Initial position will be updated
@@ -219,7 +57,7 @@ class EventHandler:
         self.update_labels()
     
     def update_labels(self):
-        """Update label positions to match current tile positions without removing any labels"""
+        """Update label positions to match current tile positions"""
         if not self.tile_labels or not self.labels_visible:
             return
             
@@ -268,7 +106,7 @@ class EventHandler:
                         replaceItemUniqueId=label_id
                     )
     
-    def _remove_all_labels(self):
+    def remove_all_labels(self):
         """Remove all tile index labels"""
         for label_id in self.tile_labels.values():
             try:
@@ -277,14 +115,67 @@ class EventHandler:
                 pass
         self.tile_labels = {}
         
+    def toggle_visibility(self):
+        """Toggle whether labels are visible"""
+        self.labels_visible = not self.labels_visible
+        if self.labels_visible:
+            self.add_labels_to_tiles()
+        else:
+            self.remove_all_labels()
+    
+    def set_update_frequency(self, frequency):
+        """Set how often labels are updated"""
+        self.update_frequency = max(1, int(frequency))
+
+
+class ConstraintManager:
+    """Handles operations related to constraints between tiles."""
+    
+    def __init__(self, simulation_data):
+        """
+        Initialize the constraint manager.
+        
+        Args:
+            simulation_data: Dictionary containing simulation data
+        """
+        self.simulation_data = simulation_data
+        self.constraint_mapping = simulation_data.get('constraint_mapping', [])
+        
+        # If no constraint mapping was provided, create one
+        if not self.constraint_mapping:
+            self._map_constraints_to_bodies()
+    
+    def _map_constraints_to_bodies(self):
+        """Map constraints to the bodies they connect"""
+        # Get all constraints in the simulation
+        num_constraints = p.getNumConstraints()
+        
+        if num_constraints == 0:
+            return
+            
+        # Store constraint IDs with validation
+        for i in range(num_constraints):
+            try:
+                constraint_info = p.getConstraintInfo(i)
+                parent_id = constraint_info[2]
+                child_id = constraint_info[3]
+                
+                # Find the tile indices for these IDs
+                if parent_id in self.simulation_data['bricks'] and child_id in self.simulation_data['bricks']:
+                    parent_idx = self.simulation_data['bricks'].index(parent_id)
+                    child_idx = self.simulation_data['bricks'].index(child_id)
+                    self.constraint_mapping.append((i, parent_idx, child_idx))
+            except Exception as e:
+                continue
+    
     def remove_constraint_between_tiles(self, tile1_idx, tile2_idx):
         """
-        Remove any constraints between two tiles specified by their indices
+        Remove constraints between two tiles specified by their indices.
         
         Args:
             tile1_idx: Index of first tile
             tile2_idx: Index of second tile
-        
+            
         Returns:
             int: Number of constraints removed
         """
@@ -294,17 +185,12 @@ class EventHandler:
             print(f"Invalid tile indices: {tile1_idx}, {tile2_idx}. Valid range: 0-{len(bricks)-1}")
             return 0
         
-        # Get the actual brick IDs for the specified indices
-        brick1_id = bricks[tile1_idx]
-        brick2_id = bricks[tile2_idx]
-        
-        # Find constraints between these tiles using our mapping
+        # Find constraints between these tiles
         constraints_removed = 0
         constraints_to_remove = []
         
-        # Loop through constraint mapping and identify constraints between the specified tiles
+        # Identify constraints between the specified tiles
         for i, constraint_data in enumerate(self.constraint_mapping):
-            # Safety check for constraint data format
             if not isinstance(constraint_data, (list, tuple)) or len(constraint_data) < 3:
                 print(f"Warning: Invalid constraint data format at index {i}: {constraint_data}")
                 continue
@@ -312,7 +198,7 @@ class EventHandler:
             try:
                 constraint_id, t1_idx, t2_idx = constraint_data
                 
-                # Match by actual indices, not by brick IDs
+                # Check if this constraint connects the specified tiles
                 if (t1_idx == tile1_idx and t2_idx == tile2_idx) or (t1_idx == tile2_idx and t2_idx == tile1_idx):
                     constraints_to_remove.append((i, constraint_id))
             except (ValueError, TypeError) as e:
@@ -322,12 +208,10 @@ class EventHandler:
         # Remove constraints in reverse order to keep indices valid
         for idx_to_remove, constraint_id in sorted(constraints_to_remove, reverse=True):
             try:
-                # Remove the constraint in PyBullet
                 p.removeConstraint(constraint_id)
-                # Remove from our mapping
                 del self.constraint_mapping[idx_to_remove]
                 constraints_removed += 1
-                print(f"Successfully removed constraint {constraint_id} between tiles {tile1_idx} and {tile2_idx}")
+                print(f"Removed constraint {constraint_id} between tiles {tile1_idx} and {tile2_idx}")
             except Exception as e:
                 print(f"Error removing constraint {constraint_id}: {e}")
         
@@ -337,9 +221,61 @@ class EventHandler:
             print(f"No constraints found between tiles {tile1_idx} and {tile2_idx}")
             
         return constraints_removed
+
+
+class SimulationController:
+    """Handles high-level simulation operations like reset and saving."""
+    
+    def __init__(self, simulation_data, simulation_functions):
+        """
+        Initialize the simulation controller.
+        
+        Args:
+            simulation_data: Dictionary containing simulation data
+            simulation_functions: Dictionary with functions for simulation control
+        """
+        self.simulation_data = simulation_data
+        self.simulation_functions = simulation_functions
+    
+    def reset_simulation(self):
+        """
+        Reset the simulation to its initial state.
+        
+        Returns:
+            dict: Updated simulation data
+        """
+        # Clean up existing bodies
+        for b in self.simulation_data['bricks']:
+            try:
+                p.removeBody(b)
+            except:
+                pass
+        
+        # Give time for physics engine to process removals
+        for _ in range(20):
+            p.stepSimulation()
+            time.sleep(0.01)
+        
+        # Reinitialize with the original data
+        sim_data, force_tiles, force_function = self.simulation_functions['initialize_simulation']()
+        self.simulation_data = sim_data
+        
+        # Stabilize the new scene
+        print("Stabilizing reset simulation...")
+        for _ in range(50):
+            p.stepSimulation()
+            time.sleep(0.001)
+            
+        print("Reset completed")
+        return sim_data
     
     def save_vertex_locations(self):
-        """Save current vertex locations to a file for MATLAB processing"""
+        """
+        Save current vertex locations to a file.
+        
+        Returns:
+            bool: Success or failure
+        """
         try:
             # Create a filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -378,7 +314,114 @@ class EventHandler:
         except Exception as e:
             print(f"Error saving vertex data: {e}")
             return False
+
+
+class EventHandler:
+    """Main event handler that coordinates between the specialized components."""
+    
+    def __init__(self, simulation_data, simulation_functions, show_labels=True):
+        """
+        Initialize the event handler with simulation data.
+        
+        Args:
+            simulation_data: Dictionary containing simulation data
+            simulation_functions: Dictionary with functions for simulation control
+            show_labels: Whether to show tile index labels (default: True)
+        """
+        self.simulation_data = simulation_data
+        self.simulation_functions = simulation_functions
+        
+        # Create specialized components
+        self.label_manager = LabelManager(simulation_data, visible=show_labels)
+        self.constraint_manager = ConstraintManager(simulation_data)
+        self.simulation_controller = SimulationController(simulation_data, simulation_functions)
+        
+        # UI control state tracking
+        self.ui_controls = {}
+        self.tile1_index = 0
+        self.tile2_index = 1
+        
+        # State tracking for edge detection on UI controls
+        self.last_reset_val = 0
+        self.last_save_val = 0
+        self.last_constraint_removal_val = 0
+        self.last_label_toggle_val = 1 if show_labels else 0
+        
+    def setup_ui_controls(self):
+        """Set up minimal PyBullet UI controls needed for Qt integration"""
+        # We only need the controls that Qt will interact with
+        # Reset and save controls aren't needed in PyBullet since Qt will call our methods directly
+        
+        # Add control for label update frequency
+        self.ui_controls['update_freq'] = p.addUserDebugParameter("Label update frequency", 1, 30, self.label_manager.update_frequency)
+        
+        return self.ui_controls
+    
+    @property
+    def labels_visible(self):
+        """Get the current label visibility state"""
+        return self.label_manager.labels_visible
+    
+    @labels_visible.setter
+    def labels_visible(self, value):
+        """Set label visibility and update as needed"""
+        if value != self.label_manager.labels_visible:
+            self.label_manager.toggle_visibility()
+    
+    def add_labels_to_tiles(self):
+        """Add labels to tiles (proxy to label manager)"""
+        self.label_manager.add_labels_to_tiles()
+    
+    def _remove_all_labels(self):
+        """Remove all labels (proxy to label manager)"""
+        self.label_manager.remove_all_labels()
+    
+    def reset_simulation(self):
+        """Reset the simulation"""
+        # Remove labels before reset
+        self.label_manager.remove_all_labels()
+        
+        # Reset simulation
+        new_sim_data = self.simulation_controller.reset_simulation()
+        
+        # Update data in all components
+        self.simulation_data = new_sim_data
+        self.label_manager.simulation_data = new_sim_data
+        self.constraint_manager.simulation_data = new_sim_data
+        self.simulation_controller.simulation_data = new_sim_data
+        
+        # Add labels again if they were visible
+        if self.label_manager.labels_visible:
+            self.label_manager.add_labels_to_tiles()
             
+        return new_sim_data
+    
+    def save_vertex_locations(self):
+        """Save current vertex locations to a file"""
+        return self.simulation_controller.save_vertex_locations()
+    
+    def remove_constraint_between_tiles(self, tile1_idx, tile2_idx):
+        """Remove constraints between specified tiles"""
+        return self.constraint_manager.remove_constraint_between_tiles(tile1_idx, tile2_idx)
+    
+    def handle_ui_events(self):
+        """
+        Handle PyBullet UI control events.
+        
+        Returns:
+            dict: Updated simulation data if reset was triggered, None otherwise
+        """
+        # We only need to handle essential parameters that aren't directly controlled by Qt
+        
+        # Check if the update frequency has changed
+        if 'update_freq' in self.ui_controls:
+            new_freq = int(p.readUserDebugParameter(self.ui_controls['update_freq']))
+            if new_freq != self.label_manager.update_frequency:
+                self.label_manager.set_update_frequency(new_freq)
+        
+        # No data to return since reset will be handled through Qt
+        return None
+    
     def step_simulation(self):
         """Run one step of the simulation with forces"""
         # Skip if there are no bricks
@@ -399,12 +442,12 @@ class EventHandler:
         
         # Apply forces using the provided function
         # Only apply forces every few steps for large simulations
-        if num_bricks < 100 or self.frame_counter % 2 == 0:
+        if num_bricks < 100 or self.label_manager.frame_counter % 2 == 0:
             self.simulation_functions['apply_forces'](whole_center)
         
         # Step simulation
         p.stepSimulation()
         
         # Update label positions if visible
-        if self.labels_visible:
-            self.update_labels()
+        if self.label_manager.labels_visible:
+            self.label_manager.update_labels()

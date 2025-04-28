@@ -230,7 +230,7 @@ def run_simulation(args):
     event_handler.setup_ui_controls()
     
     # Launch Qt control panel
-    qt_app, qt_control_panel = launch_qt_controls(sim_data, event_handler)
+    qt_app, _ = launch_qt_controls(sim_data, event_handler)
     
     # Main simulation loop
     try:
