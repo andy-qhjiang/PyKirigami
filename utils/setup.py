@@ -82,14 +82,25 @@ def setup_physics_engine(gravity=(0, 0, 0), timestep=0.001, substeps=10, num_thr
         if num_threads < 2:
             num_threads = 2  # Minimum 2 threads
     
-    # Configure physics simulation parameters
+    # Configure physics simulation parameters - avoid using numThreads directly
     p.setPhysicsEngineParameter(
         fixedTimeStep=timestep,
         numSolverIterations=substeps,
         numSubSteps=substeps,
-        solverResidualThreshold=1e-8,  # More precise simulation
-        numThreads=num_threads  # Set the number of threads for parallel computation
+        solverResidualThreshold=1e-8  # More precise simulation
     )
+    
+    # Set number of threads separately using direct API call - this is more version-compatible
+    try:
+        # Try the direct thread count setting first (older PyBullet versions)
+        p.setNumThreads(num_threads)
+        print(f"Set physics thread count to {num_threads} using setNumThreads")
+    except Exception as e:
+        # Fall back to environment variable as a last resort
+        print(f"Could not set thread count directly: {e}")
+        print(f"Setting thread count via OMP_NUM_THREADS environment variable")
+        import os
+        os.environ['OMP_NUM_THREADS'] = str(num_threads)
     
     # Try to enable GPU acceleration if requested
     if use_gpu:
@@ -106,7 +117,7 @@ def setup_physics_engine(gravity=(0, 0, 0), timestep=0.001, substeps=10, num_thr
     
     # Debug info about physics parameters
     params = p.getPhysicsEngineParameters()
-    print(f"Physics engine parameters: {num_threads} threads, {timestep}s timestep, {substeps} substeps")
+    print(f"Physics engine parameters: {params.get('numThreads', 'unknown')} threads, {timestep}s timestep, {substeps} substeps")
     
     # Set additional parameters for better performance
     p.setPhysicsEngineParameter(enableConeFriction=1)
