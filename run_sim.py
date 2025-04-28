@@ -44,11 +44,13 @@ def run_simulation(args):
     # Store original simulation parameters
     original_sim_data = {}
     
-    # Initialize physics engine
+    # Initialize physics engine with threading options
     client_id = setup_physics_engine(
         gravity=(0, 0, args.gravity),
         timestep=args.timestep,
-        substeps=args.substeps
+        substeps=args.substeps,
+        num_threads=args.num_threads,
+        use_gpu=args.use_gpu
     )
     
     # Determine if we should show labels (disable for better performance with large simulations)
@@ -64,6 +66,12 @@ def run_simulation(args):
         # Disable debug visualization for better performance
         p.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, 0)
         p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 0)
+        p.configureDebugVisualizer(p.COV_ENABLE_RGB_BUFFER_PREVIEW, 0)
+        p.configureDebugVisualizer(p.COV_ENABLE_DEPTH_BUFFER_PREVIEW, 0)
+        p.configureDebugVisualizer(p.COV_ENABLE_SEGMENTATION_MARK_PREVIEW, 0)
+        
+        # Further reduce visual quality for better performance
+        p.setPhysicsEngineParameter(sparseSdfVoxelSize=0.25)  # Less detailed collision shapes
     
     # Set up camera
     p.resetDebugVisualizerCamera(
