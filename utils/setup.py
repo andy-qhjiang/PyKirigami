@@ -7,8 +7,6 @@ the simulation environment.
 import argparse
 import pybullet as p
 import pybullet_data
-import platform
-import psutil
 
 def parse_arguments():
     """Parse command-line arguments for the simulation"""
@@ -46,14 +44,10 @@ def parse_arguments():
                        help='Enable performance optimizations')
     parser.add_argument('--ground_plane', action='store_true',
                        help='Add a ground plane to the simulation')
-    parser.add_argument('--num_threads', type=int, default=0,
-                       help='Number of CPU threads to use (0=auto-detect)')
-    parser.add_argument('--use_gpu', action='store_true',
-                       help='Enable GPU acceleration for physics if available')
     
     return parser.parse_args()
 
-def setup_physics_engine(gravity=(0, 0, 0), timestep=0.001, substeps=10, num_threads=0, use_gpu=False):
+def setup_physics_engine(gravity=(0, 0, 0), timestep=0.001, substeps=10):
     """
     Set up the PyBullet physics engine.
     
@@ -61,22 +55,10 @@ def setup_physics_engine(gravity=(0, 0, 0), timestep=0.001, substeps=10, num_thr
         gravity: Tuple of (x, y, z) gravity vector (default: no gravity)
         timestep: Simulation timestep (default: 0.001s)
         substeps: Number of substeps per simulation step
-        num_threads: Number of threads to use for physics calculation (0=auto)
-        use_gpu: Whether to use GPU acceleration for physics
         
     Returns:
         client_id: The ID of the PyBullet client
     """
-    # Set thread count via environment variable BEFORE connecting
-    # This needs to be done before connecting to have an effect
-    import os
-    if num_threads <= 0:
-        num_threads = psutil.cpu_count(logical=False) or 4  # Physical cores or default to 4
-    
-    # Set the environment variable for OpenMP threads
-    os.environ['OMP_NUM_THREADS'] = str(num_threads)
-    print(f"Setting OMP_NUM_THREADS={num_threads}")
-    
     # Use GUI interface
     client_id = p.connect(p.GUI)
     
@@ -90,52 +72,11 @@ def setup_physics_engine(gravity=(0, 0, 0), timestep=0.001, substeps=10, num_thr
     p.setPhysicsEngineParameter(
         fixedTimeStep=timestep,
         numSolverIterations=substeps,
-        numSubSteps=substeps,
-        solverResidualThreshold=1e-8  # More precise simulation
+        numSubSteps=substeps
     )
-    
-    # Try direct thread count setting as backup
-    try:
-        p.setNumThreads(num_threads)
-        print(f"Also set thread count using setNumThreads({num_threads})")
-    except Exception as e:
-        print(f"Note: setNumThreads not available in this PyBullet version: {e}")
-    
-    # Try to enable GPU acceleration if requested
-    if use_gpu:
-        try:
-            # Safely set only known compatible GPU acceleration parameters
-            # These are the most widely supported across PyBullet versions
-            p.setPhysicsEngineParameter(enableSAT=1)  # Enable GPU-based collision detection
-            print("Enabled GPU-based collision detection (SAT)")
-            
-            # Try additional parameters individually with error handling
-            try:
-                p.setPhysicsEngineParameter(contactBreakingThreshold=0.0001)
-                print("Set contact breaking threshold for better precision")
-            except Exception:
-                pass
-                
-            try:
-                p.setPhysicsEngineParameter(allowedCcdPenetration=0.0001) 
-                print("Enabled better continuous collision detection")
-            except Exception:
-                pass
-                
-            print(f"GPU acceleration partially enabled with {num_threads} helper threads")
-        except Exception as e:
-            print(f"Warning: Could not enable GPU acceleration: {e}")
-            print("Continuing with CPU-only physics")
-    else:
-        print(f"Running with CPU physics using {num_threads} threads")
-    
-    # Debug info about physics parameters
-    params = p.getPhysicsEngineParameters()
-    print(f"Active physics parameters: {params}")
     
     # Set additional parameters for better performance
     p.setPhysicsEngineParameter(enableConeFriction=1)
-    p.setPhysicsEngineParameter(contactBreakingThreshold=0.001)
     
     # Configure the visualizer for best performance vs. quality trade-off
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 1)
