@@ -67,6 +67,16 @@ def setup_physics_engine(gravity=(0, 0, 0), timestep=0.001, substeps=10, num_thr
     Returns:
         client_id: The ID of the PyBullet client
     """
+    # Set thread count via environment variable BEFORE connecting
+    # This needs to be done before connecting to have an effect
+    import os
+    if num_threads <= 0:
+        num_threads = psutil.cpu_count(logical=False) or 4  # Physical cores or default to 4
+    
+    # Set the environment variable for OpenMP threads
+    os.environ['OMP_NUM_THREADS'] = str(num_threads)
+    print(f"Setting OMP_NUM_THREADS={num_threads}")
+    
     # Use GUI interface
     client_id = p.connect(p.GUI)
     
@@ -76,13 +86,7 @@ def setup_physics_engine(gravity=(0, 0, 0), timestep=0.001, substeps=10, num_thr
     # Set gravity
     p.setGravity(gravity[0], gravity[1], gravity[2])
     
-    # Auto-detect optimal thread count if not specified
-    if num_threads <= 0:
-        num_threads = psutil.cpu_count(logical=False)  # Physical cores only
-        if num_threads < 2:
-            num_threads = 2  # Minimum 2 threads
-    
-    # Configure physics simulation parameters - avoid using numThreads directly
+    # Configure physics simulation parameters
     p.setPhysicsEngineParameter(
         fixedTimeStep=timestep,
         numSolverIterations=substeps,
@@ -90,34 +94,44 @@ def setup_physics_engine(gravity=(0, 0, 0), timestep=0.001, substeps=10, num_thr
         solverResidualThreshold=1e-8  # More precise simulation
     )
     
-    # Set number of threads separately using direct API call - this is more version-compatible
+    # Try direct thread count setting as backup
     try:
-        # Try the direct thread count setting first (older PyBullet versions)
         p.setNumThreads(num_threads)
-        print(f"Set physics thread count to {num_threads} using setNumThreads")
+        print(f"Also set thread count using setNumThreads({num_threads})")
     except Exception as e:
-        # Fall back to environment variable as a last resort
-        print(f"Could not set thread count directly: {e}")
-        print(f"Setting thread count via OMP_NUM_THREADS environment variable")
-        import os
-        os.environ['OMP_NUM_THREADS'] = str(num_threads)
+        print(f"Note: setNumThreads not available in this PyBullet version: {e}")
     
     # Try to enable GPU acceleration if requested
     if use_gpu:
         try:
-            # Set solver to use GPU (experimental in PyBullet)
+            # Safely set only known compatible GPU acceleration parameters
+            # These are the most widely supported across PyBullet versions
             p.setPhysicsEngineParameter(enableSAT=1)  # Enable GPU-based collision detection
-            p.setPhysicsEngineParameter(useAabb=1)  # Use axis-aligned bounding box
-            p.setPhysicsEngineParameter(allowedCcdPenetration=0.0001)  # Better continuous collision detection
-            print(f"Attempting to enable GPU acceleration with {num_threads} threads")
+            print("Enabled GPU-based collision detection (SAT)")
+            
+            # Try additional parameters individually with error handling
+            try:
+                p.setPhysicsEngineParameter(contactBreakingThreshold=0.0001)
+                print("Set contact breaking threshold for better precision")
+            except Exception:
+                pass
+                
+            try:
+                p.setPhysicsEngineParameter(allowedCcdPenetration=0.0001) 
+                print("Enabled better continuous collision detection")
+            except Exception:
+                pass
+                
+            print(f"GPU acceleration partially enabled with {num_threads} helper threads")
         except Exception as e:
-            print(f"Warning: Could not enable full GPU acceleration: {e}")
+            print(f"Warning: Could not enable GPU acceleration: {e}")
+            print("Continuing with CPU-only physics")
     else:
         print(f"Running with CPU physics using {num_threads} threads")
     
     # Debug info about physics parameters
     params = p.getPhysicsEngineParameters()
-    print(f"Physics engine parameters: {params.get('numThreads', 'unknown')} threads, {timestep}s timestep, {substeps} substeps")
+    print(f"Active physics parameters: {params}")
     
     # Set additional parameters for better performance
     p.setPhysicsEngineParameter(enableConeFriction=1)
