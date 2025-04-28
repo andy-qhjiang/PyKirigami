@@ -14,7 +14,8 @@ Usage:
     --hull_file rigid_3by3_hull.txt --force_type outward --connection_mode both --ground_plane --brick_thickness 0.2 --gravity -50 --force_magnitude 100
 
 
-    python run_sim.py --vertices_file cube2sphere_contracted_vertices.txt --constraints_file cube2sphere_constraints.txt --force_type normal  --force_magnitude 500 --num_threads 8 --use_gpu
+    python run_sim.py --vertices_file cube2sphere_contracted_vertices.txt --constraints_file cube2sphere_constraints.txt
+    --force_type normal  --force_magnitude 500 
 """
 import os
 import sys
