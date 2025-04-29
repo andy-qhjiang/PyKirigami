@@ -13,7 +13,7 @@ Usage:
     python run_sim.py --vertices_file tessellation_w3_h3_vertices.txt --constraints_file tessellation_w3_h3_constraints.txt --force_type normal  --force_magnitude 0 
 
 
-    python run_sim.py --vertices_file revised_tessellation_w3_h3_vertices.txt --constraints_file revised_tessellation_w3_h3_constraints.txt --force_type normal  --force_magnitude 0 --ground_plane --connection_mode both --brick_thickness 0.2 --angular_damping 50 --linear_damping 50 --gravity 
+    python run_sim.py --vertices_file planar_tessellation_w3_h3_vertices.txt --constraints_file planar_tessellation_w3_h3_constraints.txt --force_type normal  --force_magnitude 0 --ground_plane --connection_mode both --brick_thickness 0.1 --angular_damping 50 --linear_damping 50 --gravity 
  -100
 
 """
@@ -208,12 +208,6 @@ def run_simulation(args):
     
     # Set up UI controls and start interactive simulation
     print("Starting interactive simulation...")
-    print("Controls available through GUI sliders:")
-    print("  - Reset: Drag 'Reset simulation' slider above 0.5")
-    print("  - Save: Drag 'Save vertices' slider above 0.5")
-    print("  - Constraints: Remove constraints between tiles by specifying their indices")
-    print("  - Show/Hide Constraints List: Toggle list of constraint IDs and connected tiles")
-    print("  - Remove By ID: Remove a specific constraint by its ID")
     print("  - Show/Hide Labels: Toggle tile index labels visibility")
     print("  - Label update frequency: Control how often labels are updated")
     
