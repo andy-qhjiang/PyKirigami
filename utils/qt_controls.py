@@ -99,27 +99,6 @@ class KirigamiControlPanel(QMainWindow):
         self.save_button = QPushButton("Save Vertices")
         sim_control_layout.addWidget(self.save_button)
         
-        # Toggle labels button
-        self.toggle_labels_button = QPushButton("Toggle Labels")
-        sim_control_layout.addWidget(self.toggle_labels_button)
-        
-        # Label update frequency control
-        freq_layout = QHBoxLayout()
-        self.freq_label = QLabel("Label Update Frequency:")
-        self.freq_slider = QSlider(Qt.Horizontal)
-        self.freq_slider.setMinimum(1)
-        self.freq_slider.setMaximum(30)
-        self.freq_slider.setValue(5)  # Default value
-        self.freq_spinbox = QSpinBox()
-        self.freq_spinbox.setMinimum(1)
-        self.freq_spinbox.setMaximum(30)
-        self.freq_spinbox.setValue(5)  # Default value
-        
-        freq_layout.addWidget(self.freq_label)
-        freq_layout.addWidget(self.freq_slider)
-        freq_layout.addWidget(self.freq_spinbox)
-        sim_control_layout.addLayout(freq_layout)
-        
         # Set the layout for the simulation control group
         sim_control_group.setLayout(sim_control_layout)
         
@@ -149,16 +128,10 @@ class KirigamiControlPanel(QMainWindow):
         self.tile2_spinbox.valueChanged.connect(self.tile2_slider.setValue)
         self.tile2_spinbox.valueChanged.connect(self.update_pybullet_tile2)
         
-        # Connect label update frequency controls
-        self.freq_slider.valueChanged.connect(self.freq_spinbox.setValue)
-        self.freq_spinbox.valueChanged.connect(self.freq_slider.setValue)
-        self.freq_spinbox.valueChanged.connect(self.update_label_frequency)
-        
         # Connect buttons
         self.remove_constraint_button.clicked.connect(self.remove_constraint)
         self.reset_button.clicked.connect(self.reset_simulation)
         self.save_button.clicked.connect(self.save_vertices)
-        self.toggle_labels_button.clicked.connect(self.toggle_labels)
     
     def update_pybullet_tile1(self, value):
         """Update the tile1 index value in the event handler"""
@@ -167,11 +140,6 @@ class KirigamiControlPanel(QMainWindow):
     def update_pybullet_tile2(self, value):
         """Update the tile2 index value in the event handler"""
         self.event_handler.tile2_index = value
-    
-    def update_label_frequency(self, value):
-        """Update the label update frequency in the label manager"""
-        if hasattr(self.event_handler, 'label_manager'):
-            self.event_handler.label_manager.set_update_frequency(value)
     
     def sync_with_simulation(self):
         """Sync PyQt controls with current simulation state"""
@@ -182,13 +150,6 @@ class KirigamiControlPanel(QMainWindow):
             self.tile1_spinbox.setMaximum(new_max)
             self.tile2_slider.setMaximum(new_max)
             self.tile2_spinbox.setMaximum(new_max)
-            
-        # Update frequency slider to match the actual value
-        if hasattr(self.event_handler, 'label_manager'):
-            current_freq = self.event_handler.label_manager.update_frequency
-            if current_freq != self.freq_slider.value():
-                self.freq_slider.setValue(current_freq)
-                self.freq_spinbox.setValue(current_freq)
     
     def remove_constraint(self):
         """Trigger constraint removal"""
@@ -206,10 +167,6 @@ class KirigamiControlPanel(QMainWindow):
     def save_vertices(self):
         """Trigger vertex saving"""
         self.event_handler.save_vertex_locations()
-    
-    def toggle_labels(self):
-        """Toggle tile labels visibility"""
-        self.event_handler.labels_visible = not self.event_handler.labels_visible
 
 def launch_qt_controls(simulation_data, event_handler):
     """

@@ -4,7 +4,6 @@ Event handler for interactive kirigami simulation.
 This module provides a comprehensive handler for the kirigami simulation interactive controls,
 with responsibilities split into focused components:
 - EventHandler: Main coordinator and entry point
-- LabelManager: Handles the tile labels display and updates
 - ConstraintManager: Manages the physics constraints between tiles
 - SimulationController: Handles high-level simulation operations (reset, save)
 """
@@ -13,120 +12,6 @@ import time
 import numpy as np
 import pybullet as p
 from datetime import datetime
-
-class LabelManager:
-    """Handles the creation, updating, and removal of tile labels in the simulation."""
-    
-    def __init__(self, simulation_data, visible=True, update_frequency=5):
-        """
-        Initialize the label manager.
-        
-        Args:
-            simulation_data: Dictionary containing simulation data
-            visible: Whether labels should be visible initially
-            update_frequency: How often to update label positions (every N frames)
-        """
-        self.simulation_data = simulation_data
-        self.labels_visible = visible
-        self.tile_labels = {}  # Maps brick_id to its text label ID
-        self.update_frequency = update_frequency
-        self.frame_counter = 0
-        
-        # Create labels initially if they should be visible
-        if visible:
-            self.add_labels_to_tiles()
-    
-    def add_labels_to_tiles(self):
-        """Add visible index labels to all tiles in the simulation"""
-        # Remove any existing labels first
-        self.remove_all_labels()
-        
-        # Create new labels for each brick
-        for idx, brick_id in enumerate(self.simulation_data['bricks']):
-            # Add text label (position will be updated later)
-            text_id = p.addUserDebugText(
-                str(idx),
-                [0, 0, 0],  # Initial position will be updated
-                textColorRGB=[1, 1, 0],  # Yellow text
-                textSize=1.5,
-                lifeTime=0  # Persistent until removed
-            )
-            self.tile_labels[brick_id] = text_id
-        
-        # Update positions immediately
-        self.update_labels()
-    
-    def update_labels(self):
-        """Update label positions to match current tile positions"""
-        if not self.tile_labels or not self.labels_visible:
-            return
-            
-        # Check if we should update based on the frequency
-        self.frame_counter += 1
-        if self.frame_counter % self.update_frequency != 0:
-            return
-            
-        # Get all positions and orientations at once for better performance
-        positions_and_orientations = {brick_id: p.getBasePositionAndOrientation(brick_id) 
-                                     for brick_id in self.tile_labels.keys() 
-                                     if brick_id in self.simulation_data['bricks']}
-        
-        # Update positions of all existing labels
-        for brick_id, label_id in self.tile_labels.items():
-            if brick_id in self.simulation_data['bricks']:
-                idx = self.simulation_data['bricks'].index(brick_id)
-                if idx < len(self.simulation_data['normals']):
-                    # Get cached position and orientation
-                    if brick_id in positions_and_orientations:
-                        pos, orn = positions_and_orientations[brick_id]
-                    else:
-                        continue
-                        
-                    normal = self.simulation_data['normals'][idx]
-                    
-                    # Apply current orientation to normal
-                    rot = p.getMatrixFromQuaternion(orn)
-                    rot_mat = np.array(rot).reshape(3, 3)
-                    rotated_normal = rot_mat.dot(np.array(normal))
-                    
-                    # Position the label slightly above the brick in the normal direction
-                    label_pos = [
-                        pos[0] + rotated_normal[0] * 0.05,
-                        pos[1] + rotated_normal[1] * 0.05,
-                        pos[2] + rotated_normal[2] * 0.05
-                    ]
-                    
-                    # Update label position
-                    p.addUserDebugText(
-                        str(idx),
-                        label_pos,
-                        textColorRGB=[1, 1, 0],
-                        textSize=1.5,
-                        lifeTime=0,
-                        replaceItemUniqueId=label_id
-                    )
-    
-    def remove_all_labels(self):
-        """Remove all tile index labels"""
-        for label_id in self.tile_labels.values():
-            try:
-                p.removeUserDebugItem(label_id)
-            except:
-                pass
-        self.tile_labels = {}
-        
-    def toggle_visibility(self):
-        """Toggle whether labels are visible"""
-        self.labels_visible = not self.labels_visible
-        if self.labels_visible:
-            self.add_labels_to_tiles()
-        else:
-            self.remove_all_labels()
-    
-    def set_update_frequency(self, frequency):
-        """Set how often labels are updated"""
-        self.update_frequency = max(1, int(frequency))
-
 
 class ConstraintManager:
     """Handles operations related to constraints between tiles."""
@@ -319,20 +204,19 @@ class SimulationController:
 class EventHandler:
     """Main event handler that coordinates between the specialized components."""
     
-    def __init__(self, simulation_data, simulation_functions, show_labels=True):
+    def __init__(self, simulation_data, simulation_functions, show_labels=False):
         """
         Initialize the event handler with simulation data.
         
         Args:
             simulation_data: Dictionary containing simulation data
             simulation_functions: Dictionary with functions for simulation control
-            show_labels: Whether to show tile index labels (default: True)
+            show_labels: Parameter kept for backward compatibility (no longer used)
         """
         self.simulation_data = simulation_data
         self.simulation_functions = simulation_functions
         
         # Create specialized components
-        self.label_manager = LabelManager(simulation_data, visible=show_labels)
         self.constraint_manager = ConstraintManager(simulation_data)
         self.simulation_controller = SimulationController(simulation_data, simulation_functions)
         
@@ -345,54 +229,22 @@ class EventHandler:
         self.last_reset_val = 0
         self.last_save_val = 0
         self.last_constraint_removal_val = 0
-        self.last_label_toggle_val = 1 if show_labels else 0
         
     def setup_ui_controls(self):
         """Set up minimal PyBullet UI controls needed for Qt integration"""
-        # We only need the controls that Qt will interact with
-        # Reset and save controls aren't needed in PyBullet since Qt will call our methods directly
-        
-        # Add control for label update frequency
-        self.ui_controls['update_freq'] = p.addUserDebugParameter("Label update frequency", 1, 30, self.label_manager.update_frequency)
-        
+        # Empty implementation - no UI controls needed since labels were removed
+        # Keep the method for backward compatibility
         return self.ui_controls
-    
-    @property
-    def labels_visible(self):
-        """Get the current label visibility state"""
-        return self.label_manager.labels_visible
-    
-    @labels_visible.setter
-    def labels_visible(self, value):
-        """Set label visibility and update as needed"""
-        if value != self.label_manager.labels_visible:
-            self.label_manager.toggle_visibility()
-    
-    def add_labels_to_tiles(self):
-        """Add labels to tiles (proxy to label manager)"""
-        self.label_manager.add_labels_to_tiles()
-    
-    def _remove_all_labels(self):
-        """Remove all labels (proxy to label manager)"""
-        self.label_manager.remove_all_labels()
     
     def reset_simulation(self):
         """Reset the simulation"""
-        # Remove labels before reset
-        self.label_manager.remove_all_labels()
-        
         # Reset simulation
         new_sim_data = self.simulation_controller.reset_simulation()
         
         # Update data in all components
         self.simulation_data = new_sim_data
-        self.label_manager.simulation_data = new_sim_data
         self.constraint_manager.simulation_data = new_sim_data
         self.simulation_controller.simulation_data = new_sim_data
-        
-        # Add labels again if they were visible
-        if self.label_manager.labels_visible:
-            self.label_manager.add_labels_to_tiles()
             
         return new_sim_data
     
@@ -411,15 +263,7 @@ class EventHandler:
         Returns:
             dict: Updated simulation data if reset was triggered, None otherwise
         """
-        # We only need to handle essential parameters that aren't directly controlled by Qt
-        
-        # Check if the update frequency has changed
-        if 'update_freq' in self.ui_controls:
-            new_freq = int(p.readUserDebugParameter(self.ui_controls['update_freq']))
-            if new_freq != self.label_manager.update_frequency:
-                self.label_manager.set_update_frequency(new_freq)
-        
-        # No data to return since reset will be handled through Qt
+        # No UI events to handle since labels were removed
         return None
     
     def step_simulation(self):
@@ -441,13 +285,7 @@ class EventHandler:
         whole_center = np.mean(sampled_positions, axis=0)
         
         # Apply forces using the provided function
-        # Only apply forces every few steps for large simulations
-        if num_bricks < 100 or self.label_manager.frame_counter % 2 == 0:
-            self.simulation_functions['apply_forces'](whole_center)
+        self.simulation_functions['apply_forces'](whole_center)
         
         # Step simulation
         p.stepSimulation()
-        
-        # Update label positions if visible
-        if self.label_manager.labels_visible:
-            self.label_manager.update_labels()

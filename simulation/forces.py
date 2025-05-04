@@ -44,14 +44,12 @@ def calculate_normal_direction(body_id, center_pos, orientation, normal):
     world_normal = world_normal / np.linalg.norm(world_normal)
     return world_normal.tolist()
 
-
-
 def get_force_direction_function(force_type):
     """
     Get the appropriate force direction function based on the specified type.
     
     Args:
-        force_type: Type of force ('vertical', 'normal', 'outward')
+        force_type: Type of force ('normal' or 'outward')
         
     Returns:
         function: The force direction function
@@ -61,8 +59,8 @@ def get_force_direction_function(force_type):
     elif force_type == 'outward':
         return calculate_outward_direction
     else:
-        print(f"Warning: Unknown force type '{force_type}', defaulting to vertical")
-        return calculate_outward_direction
+        print(f"Warning: Unknown force type '{force_type}', defaulting to normal")
+        return calculate_normal_direction
     
 def apply_force_to_bodies(body_ids, force_function, force_magnitude, normals=None):
     """

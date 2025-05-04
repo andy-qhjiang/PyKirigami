@@ -13,7 +13,7 @@ Usage:
     python run_sim.py --vertices_file tessellation_w3_h3_vertices.txt --constraints_file tessellation_w3_h3_constraints.txt --force_type normal  --force_magnitude 0 
 
 
-    python run_sim.py --vertices_file planar_tessellation_w3_h3_vertices.txt --constraints_file planar_tessellation_w3_h3_constraints.txt --force_type normal  --force_magnitude 0 --ground_plane --connection_mode both --brick_thickness 0.1 --angular_damping 50 --linear_damping 50 --gravity 
+    python run_sim.py --vertices_file planar_tessellation_w3_h3_vertices.txt --constraints_file planar_tessellation_w3_h3_constraints.txt --force_type normal  --force_magnitude 0 --ground_plane --connection_mode both --brick_thickness 0.2 --angular_damping 50 --linear_damping 50 --gravity 
  -100
 
 """
@@ -50,11 +50,6 @@ def run_simulation(args):
         timestep=args.timestep,
         substeps=args.substeps
     )
-    
-    # Determine if we should show labels (disable for better performance with large simulations)
-    show_labels = not (args.no_labels or args.performance_mode)
-    if not show_labels:
-        print("Tile labels disabled for better performance")
     
     # Set additional performance optimizations
     if args.performance_mode:
@@ -110,13 +105,14 @@ def run_simulation(args):
         
         # Create each brick
         for i, tile_vertices in enumerate(vertices):
-            # Create brick geometry
-            verts, indices, center, tile_bottom_vertices, tile_top_vertices, normal = create_3d_brick(
+            # Create brick geometry - now returns separate collision and visual indices
+            (verts, collision_indices, visual_indices, center, 
+             tile_bottom_vertices, tile_top_vertices, normal) = create_3d_brick(
                 tile_vertices, args.brick_thickness
             )
             
-            # Create brick body in physics engine
-            brick_id = create_brick_body(verts, indices, center)
+            # Create brick body in physics engine - pass both index sets
+            brick_id = create_brick_body(verts, collision_indices, visual_indices, center)
             
             local_bricks.append(brick_id)
             brick_centers.append(center)
@@ -163,31 +159,34 @@ def run_simulation(args):
     
     # Define the force application function
     def apply_forces(whole_center):
+        force_tiles = event_handler.simulation_data['force_tiles']
+        force_function = event_handler.simulation_data['force_function']
+        force_magnitude = args.force_magnitude
         
-         force_tiles = event_handler.simulation_data['force_tiles']
-         force_function = event_handler.simulation_data['force_function']
-         force_magnitude = args.force_magnitude
-         
-         # Use the current brick and normal lists directly from the event handler
-         current_bricks = event_handler.simulation_data['bricks']
-         current_normals = event_handler.simulation_data['normals']
-         
-         # Apply forces to specific tiles
-         force_brick_ids = [brick_id for idx, brick_id in enumerate(current_bricks) 
-                         if idx in force_tiles and idx < len(current_bricks)]
-         
-         force_normals = [norm for idx, norm in enumerate(current_normals) 
+        # Skip force application if force magnitude is zero
+        if force_magnitude == 0:
+            return
+        
+        # Use the current brick and normal lists directly from the event handler
+        current_bricks = event_handler.simulation_data['bricks']
+        current_normals = event_handler.simulation_data['normals']
+        
+        # Apply forces to specific tiles
+        force_brick_ids = [brick_id for idx, brick_id in enumerate(current_bricks) 
+                        if idx in force_tiles and idx < len(current_bricks)]
+        
+        force_normals = [norm for idx, norm in enumerate(current_normals) 
                        if idx in force_tiles and idx < len(current_normals)]
-         
-         # Apply appropriate forces based on force type
-         if args.force_type == 'outward':
-             for i, body_id in enumerate(force_brick_ids):
-                 center_pos, orientation = p.getBasePositionAndOrientation(body_id)
-                 force_dir = force_function(center_pos, whole_center)
-                 force = [force_magnitude * d for d in force_dir]
-                 p.applyExternalForce(body_id, -1, force, center_pos, flags=p.WORLD_FRAME)
-         else:
-             apply_force_to_bodies(force_brick_ids, force_function, force_magnitude, force_normals)
+        
+        # Apply appropriate forces based on force type
+        if args.force_type == 'outward':
+            for i, body_id in enumerate(force_brick_ids):
+                center_pos, orientation = p.getBasePositionAndOrientation(body_id)
+                force_dir = force_function(center_pos, whole_center)
+                force = [force_magnitude * d for d in force_dir]
+                p.applyExternalForce(body_id, -1, force, center_pos, flags=p.WORLD_FRAME)
+        elif args.force_type == 'normal':
+            apply_force_to_bodies(force_brick_ids, force_function, force_magnitude, force_normals)
     
     # Initialize simulation for the first time
     sim_data, force_tiles, force_function = initialize_simulation()
@@ -198,8 +197,8 @@ def run_simulation(args):
         'apply_forces': apply_forces
     }
     
-    # Create event handler
-    event_handler = EventHandler(sim_data, simulation_functions, show_labels=show_labels)
+    # Create event handler - no label functionality
+    event_handler = EventHandler(sim_data, simulation_functions, show_labels=False)
     
     # Wait for the scene to stabilize
     for _ in range(100):
@@ -208,14 +207,12 @@ def run_simulation(args):
     
     # Set up UI controls and start interactive simulation
     print("Starting interactive simulation...")
-    print("  - Show/Hide Labels: Toggle tile index labels visibility")
-    print("  - Label update frequency: Control how often labels are updated")
-    
-    # Performance tips
-    num_bricks = len(sim_data['bricks'])
-    if num_bricks > 100 and show_labels:
-        print(f"\nPerformance tip: Your simulation has {num_bricks} tiles.")
-        print("For better performance with large simulations, use --no-labels or --performance-mode")
+    print("Controls available through GUI sliders:")
+    print("  - Reset: Drag 'Reset simulation' slider above 0.5")
+    print("  - Save: Drag 'Save vertices' slider above 0.5")
+    print("  - Constraints: Remove constraints between tiles by specifying their indices")
+    print("  - Show/Hide Constraints List: Toggle list of constraint IDs and connected tiles")
+    print("  - Remove By ID: Remove a specific constraint by its ID")
     
     print("\nTIP: To effectively 'delete' a tile, remove all constraints connected to it.")
     print("When a tile has no constraints, it becomes free and can be moved separately.")
@@ -235,7 +232,7 @@ def run_simulation(args):
                 sim_data = result
                 # No need to update local variables as we now use event_handler's data directly
             
-            # Step the simulation (includes force application and label updates)
+            # Step the simulation (includes force application)
             event_handler.step_simulation()
             
             # Process Qt events to keep the UI responsive

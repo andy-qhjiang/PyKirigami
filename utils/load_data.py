@@ -62,23 +62,3 @@ def load_hull_tiles(filename):
             hull_tiles.add(tile_ind - 1)  # Convert to 0-based indexing
     return list(hull_tiles)
 
-def create_normal_correction_list(num_face):
-    """
-    Create a normal correction list for 3D simulations.
-    
-    Args:
-        num_face: Number of faces.
-        
-    Returns:
-        list: List of correction factors.
-    """
-    # Initialize list with all 1s
-    correction_list = [1] * (6 * num_face)
-    
-    # Change values to -1 for specified intervals
-    for i in range(2*num_face, 4*num_face):
-        correction_list[i] = -1
-    for i in range(5*num_face, 6*num_face):
-        correction_list[i] = -1
-        
-    return correction_list
