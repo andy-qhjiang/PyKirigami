@@ -125,11 +125,7 @@ def parse_arguments():
     parser.add_argument('--connection_mode', choices=['top', 'bottom', 'both'], default='bottom',
                        help='How bricks should connect: top layer, bottom layer, or both')
     
-    # Visual and performance options
-    parser.add_argument('--no_labels', action='store_true', help='Disable tile labels (deprecated, labels are now off by default)')
-    parser.add_argument('--show_labels', action='store_true', help='Enable tile labels (slower performance)')
-    parser.add_argument('--performance_mode', action='store_true', 
-                       help='Enable performance optimizations')
+    # Visual options
     parser.add_argument('--ground_plane', action='store_true',
                        help='Add a ground plane to the simulation')
     

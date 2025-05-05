@@ -204,14 +204,13 @@ class SimulationController:
 class EventHandler:
     """Main event handler that coordinates between the specialized components."""
     
-    def __init__(self, simulation_data, simulation_functions, show_labels=False):
+    def __init__(self, simulation_data, simulation_functions):
         """
         Initialize the event handler with simulation data.
         
         Args:
             simulation_data: Dictionary containing simulation data
             simulation_functions: Dictionary with functions for simulation control
-            show_labels: Parameter kept for backward compatibility (no longer used)
         """
         self.simulation_data = simulation_data
         self.simulation_functions = simulation_functions
@@ -232,8 +231,7 @@ class EventHandler:
         
     def setup_ui_controls(self):
         """Set up minimal PyBullet UI controls needed for Qt integration"""
-        # Empty implementation - no UI controls needed since labels were removed
-        # Keep the method for backward compatibility
+        # This method now only returns an empty dictionary
         return self.ui_controls
     
     def reset_simulation(self):
@@ -276,7 +274,7 @@ class EventHandler:
         # Calculate the center of the structure
         # Sample only every nth brick for performance with large structures
         num_bricks = len(self.simulation_data['bricks'])
-        sampling_rate = max(1, num_bricks // 100)  # Limit to ~100 samples max
+        sampling_rate = max(1, num_bricks // 1000)  # Limit to ~1000 samples max
         sampled_bricks = self.simulation_data['bricks'][::sampling_rate]
         
         # Get positions efficiently in batch

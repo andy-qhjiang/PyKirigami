@@ -10,12 +10,10 @@ Note: This script expects 3D vertex data (12 values per line: x,y,z for 4 vertic
       For 2D data, users must preprocess files by adding z=0 to each point.
 
 Usage:
-    python run_sim.py --vertices_file tessellation_w3_h3_vertices.txt --constraints_file tessellation_w3_h3_constraints.txt --force_type normal  --force_magnitude 0 
+    python run_sim.py --vertices_file rigid_3by3_pattern_contracted_vertices.txt --constraints_file rigid_3by3_constraints.txt --hull_file rigid_3by3_hull.txt --force_type outward  --ground_plane --force_magnitude 0 --connection_mode both --gravity -1000
 
 
-    python run_sim.py --vertices_file planar_tessellation_w3_h3_vertices.txt --constraints_file planar_tessellation_w3_h3_constraints.txt --force_type normal  --force_magnitude 0 --ground_plane --connection_mode both --brick_thickness 0.2 --angular_damping 50 --linear_damping 50 --gravity 
- -100
-
+    python run_sim.py --vertices_file planar_tessellation_w3_h3_vertices.txt --constraints_file planar_tessellation_w3_h3_constraints.txt --force_type normal  --force_magnitude 0 --ground_plane --connection_mode both --brick_thickness 0.2 --angular_damping 50 --linear_damping 50 --gravity -1000
 """
 import os
 import sys
@@ -37,29 +35,17 @@ from utils.qt_controls import launch_qt_controls
 
 def run_simulation(args):
     """Run the kirigami simulation with the specified parameters"""
-    # Use local variables instead of global or nonlocal
-    bricks = []
-    normals = []
-    
+
     # Store original simulation parameters
     original_sim_data = {}
     
     # Initialize physics engine
-    client_id = setup_physics_engine(
+    setup_physics_engine(
         gravity=(0, 0, args.gravity),
         timestep=args.timestep,
         substeps=args.substeps
     )
-    
-    # Set additional performance optimizations
-    if args.performance_mode:
-        print("Performance mode enabled - optimizing simulation settings")
-        p.setPhysicsEngineParameter(enableConeFriction=0)
-        p.setPhysicsEngineParameter(numSolverIterations=4)  # Default is 10
-        # Disable debug visualization for better performance
-        p.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, 0)
-        p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 0)
-    
+
     # Set up camera
     p.resetDebugVisualizerCamera(
         cameraDistance=6.0,
@@ -155,7 +141,7 @@ def run_simulation(args):
             'original_data': original_sim_data
         }
         
-        return sim_data, force_tiles, force_function
+        return sim_data
     
     # Define the force application function
     def apply_forces(whole_center):
@@ -181,7 +167,7 @@ def run_simulation(args):
         # Apply appropriate forces based on force type
         if args.force_type == 'outward':
             for i, body_id in enumerate(force_brick_ids):
-                center_pos, orientation = p.getBasePositionAndOrientation(body_id)
+                center_pos, _ = p.getBasePositionAndOrientation(body_id)
                 force_dir = force_function(center_pos, whole_center)
                 force = [force_magnitude * d for d in force_dir]
                 p.applyExternalForce(body_id, -1, force, center_pos, flags=p.WORLD_FRAME)
@@ -189,7 +175,7 @@ def run_simulation(args):
             apply_force_to_bodies(force_brick_ids, force_function, force_magnitude, force_normals)
     
     # Initialize simulation for the first time
-    sim_data, force_tiles, force_function = initialize_simulation()
+    sim_data = initialize_simulation()
     
     # Create simulation functions dict
     simulation_functions = {
@@ -197,8 +183,8 @@ def run_simulation(args):
         'apply_forces': apply_forces
     }
     
-    # Create event handler - no label functionality
-    event_handler = EventHandler(sim_data, simulation_functions, show_labels=False)
+    # Create event handler
+    event_handler = EventHandler(sim_data, simulation_functions)
     
     # Wait for the scene to stabilize
     for _ in range(100):
@@ -207,15 +193,6 @@ def run_simulation(args):
     
     # Set up UI controls and start interactive simulation
     print("Starting interactive simulation...")
-    print("Controls available through GUI sliders:")
-    print("  - Reset: Drag 'Reset simulation' slider above 0.5")
-    print("  - Save: Drag 'Save vertices' slider above 0.5")
-    print("  - Constraints: Remove constraints between tiles by specifying their indices")
-    print("  - Show/Hide Constraints List: Toggle list of constraint IDs and connected tiles")
-    print("  - Remove By ID: Remove a specific constraint by its ID")
-    
-    print("\nTIP: To effectively 'delete' a tile, remove all constraints connected to it.")
-    print("When a tile has no constraints, it becomes free and can be moved separately.")
     
     # Set up UI controls
     event_handler.setup_ui_controls()

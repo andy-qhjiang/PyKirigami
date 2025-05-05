@@ -75,12 +75,13 @@ def apply_force_to_bodies(body_ids, force_function, force_magnitude, normals=Non
     for i, body_id in enumerate(body_ids):
         center_pos, orientation = p.getBasePositionAndOrientation(body_id)
         
-        # If normals are provided, pass to force function
+        # Calculate force direction based on the specified force type
         if normals and i < len(normals):
             normal = normals[i]
             force_dir = force_function(body_id, center_pos, orientation, normal)
         else:
             force_dir = force_function(body_id, center_pos, orientation)
-            
+                
+        # Apply the force
         force = [force_magnitude * d for d in force_dir]
         p.applyExternalForce(body_id, -1, force, center_pos, flags=p.WORLD_FRAME)
