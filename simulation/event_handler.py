@@ -142,7 +142,7 @@ class SimulationController:
             time.sleep(0.01)
         
         # Reinitialize with the original data
-        sim_data, force_tiles, force_function = self.simulation_functions['initialize_simulation']()
+        sim_data = self.simulation_functions['initialize_simulation']()
         self.simulation_data = sim_data
         
         # Stabilize the new scene

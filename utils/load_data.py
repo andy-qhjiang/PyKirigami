@@ -39,10 +39,16 @@ def load_constraints_from_file(filename):
     constraints = []
     with open(filename, 'r') as file:
         for line in file:
-            constraint = list(map(int, line.strip().split()))
-            if len(constraint) == 4:
+            parts = list(map(int, line.strip().split()))
+            if len(parts) == 4: # Old format: f_i, v_j, f_p, v_q
                 # Convert from 1-based to 0-based indexing
-                constraints.append([x-1 for x in constraint])
+                # Default type 0 if not specified (e.g. hinge using 'both' logic)
+                constraints.append([parts[0]-1, parts[1]-1, parts[2]-1, parts[3]-1, 0]) 
+            elif len(parts) == 5: # New format: f_i, v_j, f_p, v_q, type
+                # Convert from 1-based to 0-based indexing for f_i, v_j, f_p, v_q
+                constraints.append([parts[0]-1, parts[1]-1, parts[2]-1, parts[3]-1, parts[4]])
+            else:
+                print(f"Warning: Skipping constraint line with {len(parts)} values. Expected 4 or 5.")
     return constraints
 
 def load_hull_tiles(filename):

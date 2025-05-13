@@ -122,8 +122,8 @@ def parse_arguments():
     # Geometry parameters
     parser.add_argument('--brick_thickness', type=float, default=0.1,
                        help='Thickness of the brick (z-height)')
-    parser.add_argument('--connection_mode', choices=['top', 'bottom', 'both'], default='bottom',
-                       help='How bricks should connect: top layer, bottom layer, or both')
+    # parser.add_argument('--connection_mode', choices=['top', 'bottom', 'both'], default='bottom',
+    #                    help='How bricks should connect: top layer, bottom layer, or both')
     
     # Visual options
     parser.add_argument('--ground_plane', action='store_true',

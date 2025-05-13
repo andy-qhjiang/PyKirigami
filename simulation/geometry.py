@@ -132,19 +132,17 @@ def create_point_constraint(body_id1, body_id2, pivot_in_body1, pivot_in_body2):
         pivot_in_body1, pivot_in_body2
     )
 
-def create_constraints_between_bricks(bricks, constraints, bottom_vertices, top_vertices, brick_centers, connection_mode='bottom'):
-    """Create constraints between bricks based on vertex connections.
+def create_constraints_between_bricks(bricks, constraints_with_types, bottom_vertices, top_vertices, brick_centers):
+    """Create constraints between bricks based on vertex connections and type.
     
     Args:
         bricks: List of brick body IDs
-        constraints: List of constraints (f_i, v_j, f_p, v_q)
+        constraints_with_types: List of constraints (f_i, v_j, f_p, v_q, type)
+                                type=0 for hinge (connects two points, top and bottom)
+                                type=1 for point (connects one point, bottom only)
         bottom_vertices: List of bottom vertices for each brick
         top_vertices: List of top vertices for each brick
         brick_centers: List of brick center positions
-        connection_mode: Which vertices to connect ('bottom', 'top', 'both')
-                        - 'bottom': Connect original vertices (good for 3D space simulations)
-                        - 'top': Connect only top vertices
-                        - 'both': Connect both bottom and top (best for planar stability)
         
     Returns:
         tuple: (created_constraint_ids, constraint_mapping)
@@ -154,48 +152,40 @@ def create_constraints_between_bricks(bricks, constraints, bottom_vertices, top_
     created_constraints = []
     constraint_mapping = []
     
-    for f_i, v_j, f_p, v_q in constraints:
+    for f_i, v_j, f_p, v_q, constraint_type in constraints_with_types:
         # Skip invalid constraints
         if (f_i >= len(bricks) or f_p >= len(bricks) or 
-            v_j >= 4 or v_q >= 4):
-            print(f"Warning: Skipping invalid constraint: {(f_i, v_j, f_p, v_q)}")
+            v_j >= 4 or v_q >= 4): # Vertices are 0,1,2,3
+            print(f"Warning: Skipping invalid constraint input: {(f_i, v_j, f_p, v_q, constraint_type)}")
             continue
             
-        # Get centers
-        center_i = brick_centers[f_i]
-        center_p = brick_centers[f_p]
-        
-        # Connect based on connection mode
-        if connection_mode in ('bottom', 'both'):
-            # Connect bottom vertices
-            vertex_i_global = bottom_vertices[f_i][v_j]
-            vertex_p_global = bottom_vertices[f_p][v_q]
-            
-            # Calculate pivot points in local coordinates
-            pivot_in_i = [vertex_i_global[k] - center_i[k] for k in range(3)]
-            pivot_in_p = [vertex_p_global[k] - center_p[k] for k in range(3)]
-            
-            # Create constraint
-            c_id = create_point_constraint(bricks[f_i], bricks[f_p], pivot_in_i, pivot_in_p)
+        center_i = np.array(brick_centers[f_i])
+        center_p = np.array(brick_centers[f_p])
+
+        def connect_points(body1_idx, body2_idx, vert1_global_coords, vert2_global_coords):
+            pivot_in_1 = (np.array(vert1_global_coords) - center_i).tolist()
+            pivot_in_2 = (np.array(vert2_global_coords) - center_p).tolist()
+            c_id = create_point_constraint(bricks[body1_idx], bricks[body2_idx], pivot_in_1, pivot_in_2)
             created_constraints.append(c_id)
+            constraint_mapping.append((c_id, body1_idx, body2_idx))
+
+        if constraint_type == 1: # Spherical joint (bottom point connection)
+            vertex_i_global_bottom = bottom_vertices[f_i][v_j]
+            vertex_p_global_bottom = bottom_vertices[f_p][v_q]
+            connect_points(f_i, f_p, vertex_i_global_bottom, vertex_p_global_bottom)
             
-            # Store constraint mapping for easy lookup
-            constraint_mapping.append((c_id, f_i, f_p))
-            
-        if connection_mode in ('top', 'both'):
-            # Connect top vertices
+        elif constraint_type == 2: # Revolute joint (hinge around a shared vertex axis)
+            # Connect the bottom points of the shared vertex
+            vertex_i_global_bottom = bottom_vertices[f_i][v_j]
+            vertex_p_global_bottom = bottom_vertices[f_p][v_q]
+            connect_points(f_i, f_p, vertex_i_global_bottom, vertex_p_global_bottom)
+
+            # Connect the top points of the shared vertex
             vertex_i_global_top = top_vertices[f_i][v_j]
             vertex_p_global_top = top_vertices[f_p][v_q]
+            connect_points(f_i, f_p, vertex_i_global_top, vertex_p_global_top)
+        else:
+            print(f"Warning: Unknown constraint type {constraint_type} for constraint {(f_i, v_j, f_p, v_q)}. Skipping.")
+            continue
             
-            # Calculate pivot points in local coordinates
-            pivot_in_i_top = [vertex_i_global_top[k] - center_i[k] for k in range(3)]
-            pivot_in_p_top = [vertex_p_global_top[k] - center_p[k] for k in range(3)]
-            
-            # Create constraint
-            c_id = create_point_constraint(bricks[f_i], bricks[f_p], pivot_in_i_top, pivot_in_p_top)
-            created_constraints.append(c_id)
-            
-            # Store constraint mapping for easy lookup
-            constraint_mapping.append((c_id, f_i, f_p))
-    
     return created_constraints, constraint_mapping

@@ -10,10 +10,9 @@ Note: This script expects 3D vertex data (12 values per line: x,y,z for 4 vertic
       For 2D data, users must preprocess files by adding z=0 to each point.
 
 Usage:
-    python run_sim.py --vertices_file rigid_3by3_pattern_contracted_vertices.txt --constraints_file rigid_3by3_constraints.txt --hull_file rigid_3by3_hull.txt --force_type outward  --ground_plane --force_magnitude 0 --connection_mode both --gravity -1000
+    python run_sim.py --vertices_file contracted_splitted_tessellation_w3_h3_vertices.txt --constraints_file splitted0510_tessellation_w3_h3_constraints.txt --force_type normal  --force_magnitude 550 --brick_thickness 0.1 --angular_damping 2.5 --linear_damping 2.5 --ground_plane
 
 
-    python run_sim.py --vertices_file planar_tessellation_w3_h3_vertices.txt --constraints_file planar_tessellation_w3_h3_constraints.txt --force_type normal  --force_magnitude 0 --ground_plane --connection_mode both --brick_thickness 0.2 --angular_damping 50 --linear_damping 50 --gravity -1000
 """
 import os
 import sys
@@ -48,7 +47,7 @@ def run_simulation(args):
 
     # Set up camera
     p.resetDebugVisualizerCamera(
-        cameraDistance=6.0,
+        cameraDistance=12.0,
         cameraYaw=45,
         cameraPitch=-30,
         cameraTargetPosition=[0, 0, 0]
@@ -112,9 +111,8 @@ def run_simulation(args):
                         angular_damping=args.angular_damping)
         
         # Create constraints between bricks
-        connection_mode = 'bottom' if args.connection_mode is None else args.connection_mode
         constraint_ids, constraint_mapping = create_constraints_between_bricks(
-            local_bricks, constraints, bottom_vertices, top_vertices, brick_centers, connection_mode
+            local_bricks, constraints, bottom_vertices, top_vertices, brick_centers
         )
         
         # Prepare simulation data for event handler
