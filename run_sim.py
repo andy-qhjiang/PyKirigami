@@ -10,8 +10,8 @@ Note: This script expects 3D vertex data (12 values per line: x,y,z for 4 vertic
       For 2D data, users must preprocess files by adding z=0 to each point.
 
 Usage:
-    python run_sim.py --vertices_file contracted_splitted_tessellation_w3_h3_vertices.txt --constraints_file splitted0510_tessellation_w3_h3_constraints.txt --force_type normal  --force_magnitude 550 --brick_thickness 0.1 --angular_damping 2.5 --linear_damping 2.5 --ground_plane
-
+    python run_sim.py --vertices_file splitted_tessellation_w3_h3_contracted_vertices.txt --constraints_file splitted_tessellation_w3_h3_constraints.txt --force_type normal  --force_magnitude 550 --brick_thickness 0.1 --angular_damping 2.5 --linear_damping 2.5 --ground_plane
+    
     python run_sim.py --vertices_file rigid_3by3_vertices.txt --constraints_file rigid_3by3_constraints.txt --force_type outward  --force_magnitude 500 --angular_damping 2.5 --linear_damping 2.5 --ground_plane --gravity -1000
 """
 import os
