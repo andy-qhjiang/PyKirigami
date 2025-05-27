@@ -51,15 +51,15 @@ class InteractiveControls:
         # Clear fixed objects, removing indicators and constraints
         for object_id in list(self.fixed_objects.keys()): # Iterate over a copy for safe deletion
             details = self.fixed_objects.pop(object_id, {}) # Remove and get details
-            if 'indicator_id' in details:
-                try:
-                    p.removeBody(details['indicator_id'])
-                except p.error: # pybullet.error can be used if specifically imported
-                    pass # Already removed or error during removal
             if 'constraint_id' in details:
                 try:
                     p.removeConstraint(details['constraint_id'])
                 except p.error:
+                    pass # Already removed or error during removal
+            if 'indicator_id' in details:
+                try:
+                    p.removeBody(details['indicator_id'])
+                except p.error: # pybullet.error can be used if specifically imported
                     pass # Already removed or error during removal
 
         if self.ray_debug_line != -1:
@@ -146,7 +146,7 @@ class InteractiveControls:
     
     def toggle_static(self, object_id, hit_position=None):
         """
-        Toggle an object between static and dynamic states.
+        Toggle an object between static and dynamic states using a JOINT_FIXED constraint.
         
         Args:
             object_id: ID of the object to toggle
@@ -157,23 +157,27 @@ class InteractiveControls:
         """
         if object_id in self.fixed_objects:
             # Object is static - make it dynamic again
+            details = self.fixed_objects[object_id]
             # Remove constraint
-            try:
-                p.removeConstraint(self.fixed_objects[object_id]['constraint_id'])
-            except Exception as e:
-                print(f"Error removing constraint: {e}")
+            if 'constraint_id' in details:
+                try:
+                    p.removeConstraint(details['constraint_id'])
+                except Exception as e:
+                    print(f"Error removing constraint: {e}")
             
             # Remove indicator
-            try:
-                p.removeBody(self.fixed_objects[object_id]['indicator_id'])
-            except Exception as e:
-                print(f"Error removing indicator: {e}")
+            if 'indicator_id' in details:
+                try:
+                    p.removeBody(details['indicator_id'])
+                except Exception as e:
+                    print(f"Error removing indicator: {e}")
             
             # Remove from fixed objects dictionary
             del self.fixed_objects[object_id]
+            print(f"Object {object_id}: Unfixed and now dynamic.")
+            return False
    
         else: # Object is dynamic - make it static
-            
             # Get the current position and orientation before fixing
             pos, orn = p.getBasePositionAndOrientation(object_id)
             
@@ -186,14 +190,14 @@ class InteractiveControls:
                     childLinkIndex=-1,
                     jointType=p.JOINT_FIXED,
                     jointAxis=[0, 0, 0],
-                    parentFramePosition=[0, 0, 0],  # Center of object
-                    childFramePosition=pos,  # Current position in world
-                    parentFrameOrientation=[0, 0, 0, 1],
-                    childFrameOrientation=orn  # Current orientation in world
+                    parentFramePosition=[0, 0, 0],  # Relative to object's CoM
+                    childFramePosition=pos,         # Target position in world
+                    parentFrameOrientation=[0,0,0,1], # Relative orientation
+                    childFrameOrientation=orn         # Target orientation in world
                 )
                 
-                # Ensure high max force for stability
-                p.changeConstraint(constraint_id, maxForce=500000)
+                # Ensure very high max force for stability
+                p.changeConstraint(constraint_id, maxForce=1e10) # Significantly increased maxForce
                 
                 # Create visual indicator
                 indicator_id = self.create_static_indicator(object_id, hit_position)
@@ -204,12 +208,13 @@ class InteractiveControls:
                     'indicator_id': indicator_id
                 }
                 
-                print(f"Object {object_id}: Fixed in place with JOINT_FIXED constraint")
-                print("Object is now COMPLETELY FIXED (no translation or rotation)")
+                print(f"Object {object_id}: Fixed in place with JOINT_FIXED constraint (maxForce=1e10).")
+                return True
                 
             except Exception as e:
                 print(f"Error creating constraint: {e}")
-    
+                return False
+            
     def process_mouse_events(self):
         """
         Process mouse events for interactive control.

@@ -213,26 +213,28 @@ def run_simulation(args):
             # Process keyboard inputs
             if ord('r') in keys and keys[ord('r')] & p.KEY_WAS_TRIGGERED:
                 print("Resetting simulation...")
+                # Reset simulation via event handler (which calls controller)
                 sim_data = event_handler.reset_simulation()
-                # Update and reset interactive_controls after simulation reset
+                # Update interactive controls with the new simulation data
                 interactive_controls.update_simulation_data(sim_data)
-                interactive_controls.reset() 
-            
+                # Reset the state of interactive controls (e.g., clear fixed objects)
+                interactive_controls.reset()
+                print("Simulation reset and interactive controls updated.")
+
             if ord('s') in keys and keys[ord('s')] & p.KEY_WAS_TRIGGERED:
-                print("Saving vertex locations...")
                 event_handler.save_vertex_locations()
-                
+
             if ord('q') in keys and keys[ord('q')] & p.KEY_WAS_TRIGGERED:
                 print("Quitting simulation...")
                 break
             
-            # Process mouse events first
-            interactive_controls.process_mouse_events()
+            # Process mouse events for interactive controls (e.g., toggling fixed state)
+            interactive_controls.process_mouse_events() 
             
-            # Step the simulation (includes force application)
-            event_handler.step_simulation()
+            # Step simulation (applies forces, calls p.stepSimulation())
+            event_handler.step_simulation() 
             
-            # Pause to maintain frame rate
+
             time.sleep(args.timestep)
             
     except KeyboardInterrupt:
