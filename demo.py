@@ -16,14 +16,14 @@ if cid < 0:
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
 p.setPhysicsEngineParameter(numSolverIterations=10)
 p.setTimeStep(1. / 120.) # Using 120Hz for timestep
-logId = p.startStateLogging(p.STATE_LOGGING_PROFILE_TIMINGS, "visualShapeBench.json")
+
 
 # Load plane and store its ID
 planeId = p.loadURDF("plane100.urdf", useMaximalCoordinates=True)
 
 # Disable rendering during initial creation for performance
 p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
-p.configureDebugVisualizer(p.COV_ENABLE_GUI, 1) # Keep GUI elements like sliders
+p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0) # Keep GUI elements like sliders
 p.configureDebugVisualizer(p.COV_ENABLE_TINY_RENDERER, 1)
 
 
@@ -76,7 +76,6 @@ for i in range(rangex):
 
 # Enable rendering after creation
 p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
-p.stopStateLogging(logId) # Stop logging after setup
 p.setGravity(0, 0, -10)
 p.setRealTimeSimulation(1) # Using real-time simulation
 
