@@ -12,7 +12,7 @@ Note: This script expects 3D vertex data (12 values per line: x,y,z for 4 vertic
 Usage:
     python run_sim.py --vertices_file contracted_splitted_tessellation_w3_h3_vertices.txt --constraints_file splitted0510_tessellation_w3_h3_constraints.txt --force_type normal  --force_magnitude 550 --brick_thickness 0.1 --angular_damping 2.5 --linear_damping 2.5 --ground_plane
 
-
+    python run_sim.py --vertices_file rigid_3by3_vertices.txt --constraints_file rigid_3by3_constraints.txt --force_type outward  --force_magnitude 500 --angular_damping 2.5 --linear_damping 2.5 --ground_plane --gravity -1000
 """
 import os
 import sys
@@ -29,7 +29,7 @@ from utils.setup import (parse_arguments, setup_physics_engine, create_ground_pl
 from simulation.geometry import (create_3d_brick, create_brick_body, create_constraints_between_bricks)
 from simulation.forces import get_force_direction_function, apply_force_to_bodies
 from simulation.event_handler import EventHandler
-from utils.qt_controls import launch_qt_controls
+from simulation.interactive_controls import InteractiveControls # Add this import
 
 
 def run_simulation(args):
@@ -44,7 +44,11 @@ def run_simulation(args):
         timestep=args.timestep,
         substeps=args.substeps
     )
-
+    
+    # Configure debug visualizer - hide GUI panels for cleaner view
+    p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)  # Hide GUI panels
+    p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 1)  # Enable shadows for better visualization
+    
     # Set up camera
     p.resetDebugVisualizerCamera(
         cameraDistance=12.0,
@@ -111,7 +115,7 @@ def run_simulation(args):
                         angular_damping=args.angular_damping)
         
         # Create constraints between bricks
-        constraint_ids, constraint_mapping = create_constraints_between_bricks(
+        constraint_ids= create_constraints_between_bricks(
             local_bricks, constraints, bottom_vertices, top_vertices, brick_centers
         )
         
@@ -135,7 +139,6 @@ def run_simulation(args):
                 for v in tile_top_vertices
             ] for tile_top_vertices, center in zip(top_vertices, brick_centers)],
             'constraint_ids': constraint_ids,
-            'constraint_mapping': constraint_mapping,
             'original_data': original_sim_data
         }
         
@@ -182,36 +185,52 @@ def run_simulation(args):
     }
     
     # Create event handler
-    event_handler = EventHandler(sim_data, simulation_functions)
+    event_handler = EventHandler(sim_data, simulation_functions) # EventHandler no longer creates InteractiveControls
     
+    # Create interactive controls
+    interactive_controls = InteractiveControls(sim_data)
+
     # Wait for the scene to stabilize
     for _ in range(100):
         p.stepSimulation()
         time.sleep(args.timestep)
     
-    # Set up UI controls and start interactive simulation
+    # Set up interactive simulation with keyboard controls
     print("Starting interactive simulation...")
-    
-    # Set up UI controls
-    event_handler.setup_ui_controls()
-    
-    # Launch Qt control panel
-    qt_app, _ = launch_qt_controls(sim_data, event_handler)
+    print("Keyboard Controls:")
+    print("  R - Reset simulation")
+    print("  S - Save vertex locations")
+    print("  Q - Quit simulation")
+    print("Mouse Controls:")
+    print("  Right-click on a tile - Toggle fix/unfix (red sphere indicates fixed)")
     
     # Main simulation loop
     try:
         while p.isConnected():
-            # Handle UI events (buttons, sliders, etc.)
-            result = event_handler.handle_ui_events()
-            if result:  # If simulation was reset
-                sim_data = result
-                # No need to update local variables as we now use event_handler's data directly
+            # Handle keyboard events
+            keys = p.getKeyboardEvents()
+            
+            # Process keyboard inputs
+            if ord('r') in keys and keys[ord('r')] & p.KEY_WAS_TRIGGERED:
+                print("Resetting simulation...")
+                sim_data = event_handler.reset_simulation()
+                # Update and reset interactive_controls after simulation reset
+                interactive_controls.update_simulation_data(sim_data)
+                interactive_controls.reset() 
+            
+            if ord('s') in keys and keys[ord('s')] & p.KEY_WAS_TRIGGERED:
+                print("Saving vertex locations...")
+                event_handler.save_vertex_locations()
+                
+            if ord('q') in keys and keys[ord('q')] & p.KEY_WAS_TRIGGERED:
+                print("Quitting simulation...")
+                break
+            
+            # Process mouse events first
+            interactive_controls.process_mouse_events()
             
             # Step the simulation (includes force application)
             event_handler.step_simulation()
-            
-            # Process Qt events to keep the UI responsive
-            qt_app.processEvents()
             
             # Pause to maintain frame rate
             time.sleep(args.timestep)
@@ -237,7 +256,6 @@ if __name__ == "__main__":
         potential_path = os.path.join(data_dir, args.constraints_file)
         if os.path.exists(potential_path):
             args.constraints_file = potential_path
-    
     if args.hull_file and not os.path.isabs(args.hull_file):
         potential_path = os.path.join(data_dir, args.hull_file)
         if os.path.exists(potential_path):

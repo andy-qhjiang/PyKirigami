@@ -145,12 +145,11 @@ def create_constraints_between_bricks(bricks, constraints_with_types, bottom_ver
         brick_centers: List of brick center positions
         
     Returns:
-        tuple: (created_constraint_ids, constraint_mapping)
-            - created_constraint_ids: List of created constraint IDs
-            - constraint_mapping: List of (constraint_id, tile_idx1, tile_idx2) tuples
+       list: created_constraint_ids: List of created constraint IDs
+        
     """
     created_constraints = []
-    constraint_mapping = []
+    
     
     for f_i, v_j, f_p, v_q, constraint_type in constraints_with_types:
         # Skip invalid constraints
@@ -167,7 +166,7 @@ def create_constraints_between_bricks(bricks, constraints_with_types, bottom_ver
             pivot_in_2 = (np.array(vert2_global_coords) - center_p).tolist()
             c_id = create_point_constraint(bricks[body1_idx], bricks[body2_idx], pivot_in_1, pivot_in_2)
             created_constraints.append(c_id)
-            constraint_mapping.append((c_id, body1_idx, body2_idx))
+            
 
         if constraint_type == 1: # Spherical joint (bottom point connection)
             vertex_i_global_bottom = bottom_vertices[f_i][v_j]
@@ -188,4 +187,4 @@ def create_constraints_between_bricks(bricks, constraints_with_types, bottom_ver
             print(f"Warning: Unknown constraint type {constraint_type} for constraint {(f_i, v_j, f_p, v_q)}. Skipping.")
             continue
             
-    return created_constraints, constraint_mapping
+    return created_constraints
