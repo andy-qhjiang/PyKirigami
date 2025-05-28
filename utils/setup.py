@@ -102,7 +102,6 @@ def parse_arguments():
     # Input files
     parser.add_argument('--vertices_file', required=True, help='File containing vertex data')
     parser.add_argument('--constraints_file', required=True, help='File with connectivity constraints')
-    parser.add_argument('--hull_file', help='Optional file specifying hull tiles for force application')
     
     # Physics simulation parameters
     parser.add_argument('--gravity', type=float, default=0, help='Gravity constant')
@@ -112,19 +111,17 @@ def parse_arguments():
     parser.add_argument('--angular_damping', type=float, default=0.1, help='Angular damping')
     
     # Force parameters
-    parser.add_argument('--force_type', choices=['vertical', 'normal', 'outward'], default='normal',
-                       help='Type of force to apply (vertical, normal, or outward)')
+    parser.add_argument('--force_type', choices=['normal', 'outward'], default='normal',
+                       help='Type of force to apply (normal, or outward)')
     parser.add_argument('--force_magnitude', type=float, default=100, 
-                       help='Magnitude of the force applied to each tile')
-    parser.add_argument('--force_tiles', type=int, nargs='+',
-                       help='Indices of specific tiles to apply forces to (default: all)')
+                       help='Magnitude of the force applied to each brick')
+    parser.add_argument('--force_bricks', type=int, nargs='+',
+                       help='Indices of specific bricks to apply forces to (default: all)')
     
     # Geometry parameters
     parser.add_argument('--brick_thickness', type=float, default=0.1,
                        help='Thickness of the brick (z-height)')
-    # parser.add_argument('--connection_mode', choices=['top', 'bottom', 'both'], default='bottom',
-    #                    help='How bricks should connect: top layer, bottom layer, or both')
-    
+  
     # Visual options
     parser.add_argument('--ground_plane', action='store_true',
                        help='Add a ground plane to the simulation')
