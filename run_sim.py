@@ -24,7 +24,7 @@ import pybullet as p
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Import from existing modules
-from utils.load_data import (load_vertices_from_file, load_constraints_from_file, load_hull_tiles)
+from utils.load_data import (load_vertices_from_file, load_constraints_from_file)
 from utils.setup import (parse_arguments, setup_physics_engine, create_ground_plane, stabilize_bodies)
 from simulation.geometry import (create_3d_brick, create_brick_body, create_constraints_between_bricks)
 from simulation.forces import get_force_direction_function, apply_force_to_bodies
@@ -75,14 +75,11 @@ def run_simulation(args):
         original_sim_data['vertices'] = vertices.copy()
         original_sim_data['constraints'] = constraints.copy()
         
-        # Load hull tiles if specified
-        if args.hull_file and os.path.exists(args.hull_file):
-            force_tiles = load_hull_tiles(args.hull_file)
-        else:
-            force_tiles = args.force_tiles if args.force_tiles else list(range(len(vertices)))
         
-        print(f"Loaded {len(vertices)} tiles and {len(constraints)} constraints")
-        print(f"Forces will be applied to {len(force_tiles)} tiles")
+        force_bricks = args.force_bricks if args.force_bricks else list(range(len(vertices)))
+        
+        print(f"Loaded {len(vertices)} bricks and {len(constraints)} constraints")
+        print(f"Forces will be applied to {len(force_bricks)} bricks")
         
         # Get the appropriate force direction function
         force_function = get_force_direction_function(args.force_type)
@@ -93,11 +90,11 @@ def run_simulation(args):
         bottom_vertices = []
         
         # Create each brick
-        for i, tile_vertices in enumerate(vertices):
+        for i, brick_vertices in enumerate(vertices):
             # Create brick geometry - now returns separate collision and visual indices
             (verts, collision_indices, visual_indices, center, 
-             tile_bottom_vertices, tile_top_vertices, normal) = create_3d_brick(
-                tile_vertices, args.brick_thickness
+             brick_bottom_vertices, brick_top_vertices, normal) = create_3d_brick(
+                brick_vertices, args.brick_thickness
             )
             
             # Create brick body in physics engine - pass both index sets
@@ -105,8 +102,8 @@ def run_simulation(args):
             
             local_bricks.append(brick_id)
             brick_centers.append(center)
-            top_vertices.append(tile_top_vertices)
-            bottom_vertices.append(tile_bottom_vertices)
+            top_vertices.append(brick_top_vertices)
+            bottom_vertices.append(brick_bottom_vertices)
             local_normals.append(normal)
         
         # Stabilize bricks
@@ -123,11 +120,10 @@ def run_simulation(args):
         sim_data = {
             'vertices_file': args.vertices_file,
             'constraints_file': args.constraints_file,
-            'hull_file': args.hull_file,
             'args': args,
             'vertices': vertices,
             'constraints': constraints,
-            'force_tiles': force_tiles,
+            'force_bricks': force_bricks,
             'force_function': force_function,
             'bricks': local_bricks,
             'normals': local_normals,
@@ -136,8 +132,8 @@ def run_simulation(args):
             'bottom_vertices': bottom_vertices,
             'local_top_vertices': [[
                 [v[k] - center[k] for k in range(3)]
-                for v in tile_top_vertices
-            ] for tile_top_vertices, center in zip(top_vertices, brick_centers)],
+                for v in brick_top_vertices
+            ] for brick_top_vertices, center in zip(top_vertices, brick_centers)],
             'constraint_ids': constraint_ids,
             'original_data': original_sim_data
         }
@@ -146,7 +142,7 @@ def run_simulation(args):
     
     # Define the force application function
     def apply_forces(whole_center):
-        force_tiles = event_handler.simulation_data['force_tiles']
+        force_bricks = event_handler.simulation_data['force_bricks']
         force_function = event_handler.simulation_data['force_function']
         force_magnitude = args.force_magnitude
         
@@ -158,12 +154,12 @@ def run_simulation(args):
         current_bricks = event_handler.simulation_data['bricks']
         current_normals = event_handler.simulation_data['normals']
         
-        # Apply forces to specific tiles
+        # Apply forces to specific bricks
         force_brick_ids = [brick_id for idx, brick_id in enumerate(current_bricks) 
-                        if idx in force_tiles and idx < len(current_bricks)]
+                        if idx in force_bricks and idx < len(current_bricks)]
         
         force_normals = [norm for idx, norm in enumerate(current_normals) 
-                       if idx in force_tiles and idx < len(current_normals)]
+                       if idx in force_bricks and idx < len(current_normals)]
         
         # Apply appropriate forces based on force type
         if args.force_type == 'outward':
@@ -202,7 +198,7 @@ def run_simulation(args):
     print("  S - Save vertex locations")
     print("  Q - Quit simulation")
     print("Mouse Controls:")
-    print("  Right-click on a tile - Toggle fix/unfix (red sphere indicates fixed)")
+    print("  Right-click on a brick - Toggle fix/unfix (red sphere indicates fixed)")
     
     # Main simulation loop
     try:
@@ -213,12 +209,13 @@ def run_simulation(args):
             # Process keyboard inputs
             if ord('r') in keys and keys[ord('r')] & p.KEY_WAS_TRIGGERED:
                 print("Resetting simulation...")
+                # Reset the state of interactive controls (e.g., clear fixed objects)
+                interactive_controls.reset()
                 # Reset simulation via event handler (which calls controller)
                 sim_data = event_handler.reset_simulation()
                 # Update interactive controls with the new simulation data
                 interactive_controls.update_simulation_data(sim_data)
-                # Reset the state of interactive controls (e.g., clear fixed objects)
-                interactive_controls.reset()
+                
                 print("Simulation reset and interactive controls updated.")
 
             if ord('s') in keys and keys[ord('s')] & p.KEY_WAS_TRIGGERED:
@@ -258,10 +255,7 @@ if __name__ == "__main__":
         potential_path = os.path.join(data_dir, args.constraints_file)
         if os.path.exists(potential_path):
             args.constraints_file = potential_path
-    if args.hull_file and not os.path.isabs(args.hull_file):
-        potential_path = os.path.join(data_dir, args.hull_file)
-        if os.path.exists(potential_path):
-            args.hull_file = potential_path
+    
     
     # Run the simulation
     run_simulation(args)
