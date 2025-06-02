@@ -51,7 +51,7 @@ def run_simulation(args):
     
     # Set up camera
     p.resetDebugVisualizerCamera(
-        cameraDistance=12.0,
+        cameraDistance=8.0,
         cameraYaw=45,
         cameraPitch=-30,
         cameraTargetPosition=[0, 0, 0]
@@ -190,12 +190,12 @@ def run_simulation(args):
     for _ in range(100):
         p.stepSimulation()
         time.sleep(args.timestep)
-    
-    # Set up interactive simulation with keyboard controls
+      # Set up interactive simulation with keyboard controls
     print("Starting interactive simulation...")
     print("Keyboard Controls:")
     print("  R - Reset simulation")
     print("  S - Save vertex locations")
+    print("  P - Toggle pause/resume")
     print("  Q - Quit simulation")
     print("Mouse Controls:")
     print("  Right-click on a brick - Toggle fix/unfix (red sphere indicates fixed)")
@@ -212,14 +212,16 @@ def run_simulation(args):
                 # Reset the state of interactive controls (e.g., clear fixed objects)
                 interactive_controls.reset()
                 # Reset simulation via event handler (which calls controller)
-                sim_data = event_handler.reset_simulation()
-                # Update interactive controls with the new simulation data
+                sim_data = event_handler.reset_simulation()                # Update interactive controls with the new simulation data
                 interactive_controls.update_simulation_data(sim_data)
                 
                 print("Simulation reset and interactive controls updated.")
 
             if ord('s') in keys and keys[ord('s')] & p.KEY_WAS_TRIGGERED:
                 event_handler.save_vertex_locations()
+
+            if ord('p') in keys and keys[ord('p')] & p.KEY_WAS_TRIGGERED:
+                event_handler.toggle_pause()
 
             if ord('q') in keys and keys[ord('q')] & p.KEY_WAS_TRIGGERED:
                 print("Quitting simulation...")

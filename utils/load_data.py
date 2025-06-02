@@ -1,7 +1,6 @@
 """
 Data loading utilities for the kirigami simulation project.
 """
-import os
 import numpy as np
 
 def load_vertices_from_file(filename):

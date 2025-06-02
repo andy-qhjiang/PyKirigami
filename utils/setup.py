@@ -20,8 +20,7 @@ def setup_physics_engine(gravity=(0, 0, -9.81), timestep=1/240, substeps=10, gui
         gui: Whether to use GUI or direct mode (default: True)
         
     Returns:
-        int: The PyBullet client ID
-    """
+        int: The PyBullet client ID    """
     if gui:
         client_id = p.connect(p.GUI)
     else:
@@ -30,6 +29,9 @@ def setup_physics_engine(gravity=(0, 0, -9.81), timestep=1/240, substeps=10, gui
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     p.setGravity(*gravity)
     p.setPhysicsEngineParameter(fixedTimeStep=timestep, numSubSteps=substeps)
+    
+    # Disable profiling to prevent generation of timings_*.json files
+    p.setPhysicsEngineParameter(enableFileCaching=0, reportSolverAnalytics=0, deterministicOverlappingPairs=1)
     
     return client_id
 
@@ -42,7 +44,7 @@ def create_ground_plane():
     """
     return p.loadURDF("plane.urdf")
 
-def stabilize_bodies(body_ids, linear_damping=25, angular_damping=25):
+def stabilize_bodies(body_ids, linear_damping=2.5, angular_damping=2.5):
     """
     Apply damping to bodies to stabilize them.
     
@@ -67,8 +69,7 @@ def initialize_pybullet(use_gui=True, gravity=(0, 0, -9.81), add_ground_plane=Tr
         
     Returns:
         int: PyBullet client ID
-        int: Ground plane ID if added, None otherwise
-    """
+        int: Ground plane ID if added, None otherwise    """
     client_id = p.connect(p.GUI if use_gui else p.DIRECT)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     p.setGravity(*gravity)
@@ -76,24 +77,15 @@ def initialize_pybullet(use_gui=True, gravity=(0, 0, -9.81), add_ground_plane=Tr
     # Simulation parameters for stability
     p.setPhysicsEngineParameter(fixedTimeStep=1/240, numSubSteps=10)
     
+    # Disable profiling to prevent generation of timings_*.json files
+    p.setPhysicsEngineParameter(enableFileCaching=0, reportSolverAnalytics=0, deterministicOverlappingPairs=1)
+    
     plane_id = None
     if add_ground_plane:
         plane_id = p.loadURDF("plane.urdf")
         
     return client_id, plane_id
 
-# Keep the existing stabilize_object function for backward compatibility
-def stabilize_object(object_id, linear_damping=25, angular_damping=25):
-    """
-    Apply stabilization to a PyBullet object.
-    
-    Args:
-        object_id: PyBullet object ID
-        linear_damping: Linear damping coefficient
-        angular_damping: Angular damping coefficient
-    """
-    p.resetBaseVelocity(object_id, [0, 0, 0], [0, 0, 0])
-    p.changeDynamics(object_id, -1, linearDamping=linear_damping, angularDamping=angular_damping)
 
 def parse_arguments():
     """Parse command-line arguments for the simulation"""
@@ -105,8 +97,8 @@ def parse_arguments():
     
     # Physics simulation parameters
     parser.add_argument('--gravity', type=float, default=0, help='Gravity constant')
-    parser.add_argument('--timestep', type=float, default=0.001, help='Physics simulation timestep')
-    parser.add_argument('--substeps', type=int, default=10, help='Physics substeps per step')
+    parser.add_argument('--timestep', type=float, default=1/240, help='Physics simulation timestep')
+    parser.add_argument('--substeps', type=int, default=20, help='Physics substeps per step')
     parser.add_argument('--linear_damping', type=float, default=0.1, help='Linear damping')
     parser.add_argument('--angular_damping', type=float, default=0.1, help='Angular damping')
     

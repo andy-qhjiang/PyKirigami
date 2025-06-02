@@ -25,6 +25,7 @@ class SimulationController:
         """
         self.simulation_data = simulation_data
         self.simulation_functions = simulation_functions
+        self.is_paused = False  # Track pause state
     
     def reset_simulation(self):
         """
@@ -103,7 +104,66 @@ class SimulationController:
         except Exception as e:
             print(f"Error saving vertex data: {e}")
             return False
-
+    
+    def toggle_pause(self):
+        """
+        Toggle pause state of the simulation.
+        When paused, all objects are frozen in place.
+        
+        Returns:
+            bool: Current pause state (True if paused, False if running)
+        """
+        try:
+            if not self.is_paused:
+                # Pause the simulation
+                print("Pausing simulation...")
+                
+                # Save current velocities and set them to zero
+                for brick_id in self.simulation_data['bricks']:
+                    try:
+                        
+                        # Stop the brick by setting velocity to zero
+                        p.resetBaseVelocity(brick_id, [0, 0, 0], [0, 0, 0])
+                        
+                        # Temporarily increase damping to maximum to prevent movement
+                        p.changeDynamics(brick_id, -1, 
+                                       linearDamping=100.0, 
+                                       angularDamping=100.0)
+                    except Exception as e:
+                        print(f"Warning: Could not pause brick {brick_id}: {e}")
+                
+                self.is_paused = True
+                print("Simulation paused. Press 'P' again to resume.")
+                
+            else:
+                # Resume the simulation
+                print("Resuming simulation...")
+                
+                # Restore original damping and velocities
+                args = self.simulation_data.get('args')
+                linear_damping = args.linear_damping if args else 2.5
+                angular_damping = args.angular_damping if args else 2.5
+                
+                for brick_id in self.simulation_data['bricks']:
+                    try:
+                        # Restore original damping
+                        p.changeDynamics(brick_id, -1, 
+                                       linearDamping=linear_damping, 
+                                       angularDamping=angular_damping)
+                        
+                    except Exception as e:
+                        print(f"Warning: Could not resume brick {brick_id}: {e}")
+                
+                
+                self.is_paused = False
+                print("Simulation resumed.")
+            
+            return self.is_paused
+            
+        except Exception as e:
+            print(f"Error toggling pause: {e}")
+            return self.is_paused
+        
 
 class EventHandler:
     """Main event handler that coordinates between the specialized components."""
@@ -151,12 +211,21 @@ class EventHandler:
         """Save current vertex locations to a file"""
         return self.simulation_controller.save_vertex_locations()
     
-    # remove_constraint_between_tiles method removed
+    def toggle_pause(self):
+        """Toggle pause state of the simulation"""
+        return self.simulation_controller.toggle_pause()
+      # remove_constraint_between_tiles method removed
     
     # handle_ui_events method removed
     
     def step_simulation(self):
         """Run one step of the simulation with forces"""
+        # Check if simulation is paused
+        if self.simulation_controller.is_paused:
+            # Still step physics to maintain GUI responsiveness, but don't apply forces
+            p.stepSimulation()
+            return
+        
         # Process any mouse events for interactive controls - MOVED to run_sim.py
         # self.interactive_controls.process_mouse_events() # REMOVED
         
