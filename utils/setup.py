@@ -44,47 +44,19 @@ def create_ground_plane():
     """
     return p.loadURDF("plane.urdf")
 
-def stabilize_bodies(body_ids, linear_damping=2.5, angular_damping=2.5):
+def stabilize_bodies(body_ids, linear_damping=1, angular_damping=1):
     """
     Apply damping to bodies to stabilize them.
     
     Args:
         body_ids: List of body IDs to stabilize
-        linear_damping: Linear damping factor (default: 25)
-        angular_damping: Angular damping factor (default: 25)
+        linear_damping: Linear damping factor (default: 1)
+        angular_damping: Angular damping factor (default: 1)
     """
     for body_id in body_ids:
         p.resetBaseVelocity(body_id, [0, 0, 0], [0, 0, 0])
         p.changeDynamics(body_id, -1, linearDamping=linear_damping, angularDamping=angular_damping)
 
-# Keep the existing initialize_pybullet function for backward compatibility
-def initialize_pybullet(use_gui=True, gravity=(0, 0, -9.81), add_ground_plane=True):
-    """
-    Initialize the PyBullet physics simulation.
-    
-    Args:
-        use_gui: Whether to use GUI or direct mode
-        gravity: Gravity vector (x, y, z)
-        add_ground_plane: Whether to add a ground plane
-        
-    Returns:
-        int: PyBullet client ID
-        int: Ground plane ID if added, None otherwise    """
-    client_id = p.connect(p.GUI if use_gui else p.DIRECT)
-    p.setAdditionalSearchPath(pybullet_data.getDataPath())
-    p.setGravity(*gravity)
-    
-    # Simulation parameters for stability
-    p.setPhysicsEngineParameter(fixedTimeStep=1/240, numSubSteps=10)
-    
-    # Disable profiling to prevent generation of timings_*.json files
-    p.setPhysicsEngineParameter(enableFileCaching=0, reportSolverAnalytics=0, deterministicOverlappingPairs=1)
-    
-    plane_id = None
-    if add_ground_plane:
-        plane_id = p.loadURDF("plane.urdf")
-        
-    return client_id, plane_id
 
 
 def parse_arguments():
@@ -94,25 +66,31 @@ def parse_arguments():
     # Input files
     parser.add_argument('--vertices_file', required=True, help='File containing vertex data')
     parser.add_argument('--constraints_file', required=True, help='File with connectivity constraints')
+    parser.add_argument('--force_bricks_file', help='File with specific bricks to apply forces to (optional)')
     
     # Physics simulation parameters
     parser.add_argument('--gravity', type=float, default=0, help='Gravity constant')
     parser.add_argument('--timestep', type=float, default=1/240, help='Physics simulation timestep')
     parser.add_argument('--substeps', type=int, default=20, help='Physics substeps per step')
-    parser.add_argument('--linear_damping', type=float, default=0.1, help='Linear damping')
-    parser.add_argument('--angular_damping', type=float, default=0.1, help='Angular damping')
     
-    # Force parameters
-    parser.add_argument('--force_type', choices=['normal', 'outward'], default='normal',
-                       help='Type of force to apply (normal, or outward)')
-    parser.add_argument('--force_magnitude', type=float, default=100, 
-                       help='Magnitude of the force applied to each brick')
-    parser.add_argument('--force_bricks', type=int, nargs='+',
-                       help='Indices of specific bricks to apply forces to (default: all)')
+    
+    # Expansion parameters
+    parser.add_argument('--auto_expand', action='store_true',
+                       help='Automatically expand the structure using spring-like forces')
+    parser.add_argument('--spring_radius', type=float, default=5.0,
+                       help='Target radius for spring expansion')
+    parser.add_argument('--spring_stiffness', type=float, default=100.0,
+                       help='Stiffness coefficient for spring forces')
+    parser.add_argument('--spring_damping', type=float, default=5.0,
+                       help='Damping coefficient for spring forces')
+    
+    
     
     # Geometry parameters
-    parser.add_argument('--brick_thickness', type=float, default=0.1,
+    parser.add_argument('--brick_thickness', type=float, default=0.02,
                        help='Thickness of the brick (z-height)')
+    parser.add_argument('--linear_damping', type=float, default=1, help='Linear damping')
+    parser.add_argument('--angular_damping', type=float, default=1, help='Angular damping')
   
     # Visual options
     parser.add_argument('--ground_plane', action='store_true',

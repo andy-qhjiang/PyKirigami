@@ -63,10 +63,10 @@ def create_3d_brick(vertices_flat, brick_thickness):
         
     double_sided_indices = [idx for sublist in double_sided_indices_list for idx in sublist]
     
-    return (verts, single_sided_indices, double_sided_indices, center.tolist(), 
+    return (verts, double_sided_indices, center.tolist(), 
             bottom_vertices.tolist(), top_vertices.tolist(), normal.tolist())
 
-def create_brick_body(verts, collision_indices, visual_indices, center, mass=1.0):
+def create_brick_body(verts, visual_indices, center, mass=1.0):
     """
     Create a brick body in PyBullet using separate collision and visual indices.
     

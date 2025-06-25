@@ -41,21 +41,15 @@ class SimulationController:
             except:
                 pass
         
-        # Give time for physics engine to process removals
-        for _ in range(20):
-            p.stepSimulation()
-            time.sleep(0.01)
+        # # Give time for physics engine to process removals
+        # for _ in range(20):
+        #     p.stepSimulation()
+        #     time.sleep(0.01)
         
         # Reinitialize with the original data
         sim_data = self.simulation_functions['initialize_simulation']()
         self.simulation_data = sim_data
-        
-        # Stabilize the new scene
-        print("Stabilizing reset simulation...")
-        for _ in range(50):
-            p.stepSimulation()
-            time.sleep(0.001)
-            
+      
         print("Reset completed")
         return sim_data
     

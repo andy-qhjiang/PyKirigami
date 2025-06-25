@@ -45,5 +45,22 @@ def load_constraints_from_file(filename):
                 print(f"Warning: Skipping constraint line with {len(parts)} values. Expected 4 or 5.")
     return constraints
 
-
-
+def load_force_bricks(filename):
+    """
+    Load specific bricks to apply forces to from a file.
+    
+    Args:
+        filename: Path to the file containing force brick index.
+        
+    Returns:
+        list: List of brick IDs to apply forces to.
+    """
+    force_bricks = []
+    with open(filename, 'r') as file:
+        for line in file:
+            parts = list(map(int, line.strip().split()))
+            if len(parts) == 1:  # Expecting a single brick ID per line
+                force_bricks.append(parts[0] - 1)  # Convert to zero-based index
+            else:
+                print(f"Warning: Skipping line with {len(parts)} values. Expected 1.")
+    return force_bricks

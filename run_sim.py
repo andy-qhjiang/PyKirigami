@@ -1,18 +1,16 @@
 """
-Unified Kirigami Simulation Script
+Simplified Kirigami Simulation Script with Auto-Expansion
 
-This script provides a unified interface for kirigami simulation with different force types:
-- vertical: Forces in the z direction 
-- normal: Forces along the normal direction of each face
-- outward: Forces radiating from the center of the structure
+This script provides a simplified interface for kirigami simulation with spring-like forces
+for automatic expansion of contracted structures.
 
 Note: This script expects 3D vertex data (12 values per line: x,y,z for 4 vertices).
       For 2D data, users must preprocess files by adding z=0 to each point.
 
 Usage:
-    python run_sim.py --vertices_file splitted_tessellation_w3_h3_contracted_vertices.txt --constraints_file splitted_tessellation_w3_h3_constraints.txt --force_type normal  --force_magnitude 550 --brick_thickness 0.1 --angular_damping 2.5 --linear_damping 2.5 --ground_plane
-    
-    python run_sim.py --vertices_file rigid_3by3_vertices.txt --constraints_file rigid_3by3_constraints.txt --force_type outward  --force_magnitude 500 --angular_damping 2.5 --linear_damping 2.5 --ground_plane --gravity -1000
+    python run_sim.py --vertices_file cube2sphere_contracted_vertices.txt --constraints_file cube2sphere_constraints.txt --auto_expand --spring_radius 10.0 --spring_stiffness 250.0 --spring_damping 2.0 --gravity 0
+
+    python run_sim.py --vertices_file rigid_3by3_vertices.txt --constraints_file rigid_3by3_constraints.txt --auto_expand --spring_radius 10.0 --spring_stiffness 100.0 --spring_damping 2.0 --angular_damping 2.5 --linear_damping 2.5 --ground_plane --gravity -100
 """
 import os
 import sys
@@ -24,12 +22,12 @@ import pybullet as p
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Import from existing modules
-from utils.load_data import (load_vertices_from_file, load_constraints_from_file)
+from utils.load_data import *
 from utils.setup import (parse_arguments, setup_physics_engine, create_ground_plane, stabilize_bodies)
-from simulation.geometry import (create_3d_brick, create_brick_body, create_constraints_between_bricks)
-from simulation.forces import get_force_direction_function, apply_force_to_bodies
+from utils.geometry import (create_3d_brick, create_brick_body, create_constraints_between_bricks)
+from simulation.spring_forces import apply_spring_forces
 from simulation.event_handler import EventHandler
-from simulation.interactive_controls import InteractiveControls # Add this import
+from simulation.interactive_controls import InteractiveControls
 
 
 def run_simulation(args):
@@ -70,19 +68,16 @@ def run_simulation(args):
         # Load data
         vertices = load_vertices_from_file(args.vertices_file)
         constraints = load_constraints_from_file(args.constraints_file)
-        
+        force_bricks = load_force_bricks(args.force_bricks_file) if args.force_bricks_file else list(range(len(vertices)))
+
         # Store original data for reset capability
         original_sim_data['vertices'] = vertices.copy()
         original_sim_data['constraints'] = constraints.copy()
+        original_sim_data['force_bricks'] = force_bricks.copy()        
         
-        
-        force_bricks = args.force_bricks if args.force_bricks else list(range(len(vertices)))
         
         print(f"Loaded {len(vertices)} bricks and {len(constraints)} constraints")
         print(f"Forces will be applied to {len(force_bricks)} bricks")
-        
-        # Get the appropriate force direction function
-        force_function = get_force_direction_function(args.force_type)
         
         # Create bricks
         brick_centers = []
@@ -92,13 +87,13 @@ def run_simulation(args):
         # Create each brick
         for i, brick_vertices in enumerate(vertices):
             # Create brick geometry - now returns separate collision and visual indices
-            (verts, collision_indices, visual_indices, center, 
+            (verts, visual_indices, center, 
              brick_bottom_vertices, brick_top_vertices, normal) = create_3d_brick(
                 brick_vertices, args.brick_thickness
             )
             
             # Create brick body in physics engine - pass both index sets
-            brick_id = create_brick_body(verts, collision_indices, visual_indices, center)
+            brick_id = create_brick_body(verts, visual_indices, center)
             
             local_bricks.append(brick_id)
             brick_centers.append(center)
@@ -124,7 +119,6 @@ def run_simulation(args):
             'vertices': vertices,
             'constraints': constraints,
             'force_bricks': force_bricks,
-            'force_function': force_function,
             'bricks': local_bricks,
             'normals': local_normals,
             'brick_centers': brick_centers,
@@ -142,34 +136,28 @@ def run_simulation(args):
     
     # Define the force application function
     def apply_forces(whole_center):
-        force_bricks = event_handler.simulation_data['force_bricks']
-        force_function = event_handler.simulation_data['force_function']
-        force_magnitude = args.force_magnitude
-        
-        # Skip force application if force magnitude is zero
-        if force_magnitude == 0:
+        # If auto_expand is not enabled, no forces will be applied
+        if not args.auto_expand:
             return
         
-        # Use the current brick and normal lists directly from the event handler
+        force_bricks = event_handler.simulation_data['force_bricks']
+        
+        # Use the current brick list directly from the event handler
         current_bricks = event_handler.simulation_data['bricks']
-        current_normals = event_handler.simulation_data['normals']
         
         # Apply forces to specific bricks
         force_brick_ids = [brick_id for idx, brick_id in enumerate(current_bricks) 
                         if idx in force_bricks and idx < len(current_bricks)]
         
-        force_normals = [norm for idx, norm in enumerate(current_normals) 
-                       if idx in force_bricks and idx < len(current_normals)]
+        # Setup spring parameters
+        spring_params = {
+            'radius': args.spring_radius,
+            'stiffness': args.spring_stiffness,
+            'damping': args.spring_damping,
+        }
         
-        # Apply appropriate forces based on force type
-        if args.force_type == 'outward':
-            for i, body_id in enumerate(force_brick_ids):
-                center_pos, _ = p.getBasePositionAndOrientation(body_id)
-                force_dir = force_function(center_pos, whole_center)
-                force = [force_magnitude * d for d in force_dir]
-                p.applyExternalForce(body_id, -1, force, center_pos, flags=p.WORLD_FRAME)
-        elif args.force_type == 'normal':
-            apply_force_to_bodies(force_brick_ids, force_function, force_magnitude, force_normals)
+        # Apply spring forces to all force bricks
+        apply_spring_forces(force_brick_ids, whole_center, spring_params)
     
     # Initialize simulation for the first time
     sim_data = initialize_simulation()
@@ -181,16 +169,12 @@ def run_simulation(args):
     }
     
     # Create event handler
-    event_handler = EventHandler(sim_data, simulation_functions) # EventHandler no longer creates InteractiveControls
+    event_handler = EventHandler(sim_data, simulation_functions)
     
     # Create interactive controls
     interactive_controls = InteractiveControls(sim_data)
-
-    # Wait for the scene to stabilize
-    for _ in range(100):
-        p.stepSimulation()
-        time.sleep(args.timestep)
-      # Set up interactive simulation with keyboard controls
+    
+    # Set up interactive simulation with keyboard controls
     print("Starting interactive simulation...")
     print("Keyboard Controls:")
     print("  R - Reset simulation")
@@ -212,7 +196,8 @@ def run_simulation(args):
                 # Reset the state of interactive controls (e.g., clear fixed objects)
                 interactive_controls.reset()
                 # Reset simulation via event handler (which calls controller)
-                sim_data = event_handler.reset_simulation()                # Update interactive controls with the new simulation data
+                sim_data = event_handler.reset_simulation()                
+                # Update interactive controls with the new simulation data
                 interactive_controls.update_simulation_data(sim_data)
                 
                 print("Simulation reset and interactive controls updated.")
@@ -233,7 +218,6 @@ def run_simulation(args):
             # Step simulation (applies forces, calls p.stepSimulation())
             event_handler.step_simulation() 
             
-
             time.sleep(args.timestep)
             
     except KeyboardInterrupt:
@@ -258,6 +242,10 @@ if __name__ == "__main__":
         if os.path.exists(potential_path):
             args.constraints_file = potential_path
     
+    if args.force_bricks_file and not os.path.isabs(args.force_bricks_file):
+        potential_path = os.path.join(data_dir, args.force_bricks_file)
+        if os.path.exists(potential_path):
+            args.force_bricks_file = potential_path
     
     # Run the simulation
     run_simulation(args)
