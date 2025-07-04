@@ -8,9 +8,7 @@ import pybullet_data
 import numpy as np
 
 # Connect to PyBullet
-cid = p.connect(p.SHARED_MEMORY)
-if cid < 0:
-    p.connect(p.GUI)
+p.connect(p.GUI)  
 
 # Set up the environment
 p.setAdditionalSearchPath(pybullet_data.getDataPath())

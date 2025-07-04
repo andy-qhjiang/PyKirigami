@@ -6,8 +6,6 @@ import pybullet_data
 import numpy as np
 import argparse
 
-DEFAULT_BRICK_THICKNESS = 0.02
-DEFAULT_FORCE_MAGNITUDE = 50
 
 def setup_physics_engine(gravity=(0, 0, -9.81), timestep=1/240, substeps=10, gui=True):
     """

@@ -8,22 +8,23 @@ def load_vertices_from_file(filename):
     Load 3D vertex data from file.
     
     Args:
-        filename: Path to the file containing 3D vertex data with 12 values per line
-                 (x,y,z for 4 vertices). For 2D data, users should preprocess files
-                 by adding z=0 to each point.
+        filename: Path to the file containing 3D vertex data with n*3 values per line
+                 (x,y,z for n vertices). Supports both triangles (9 values) and 
+                 quadrilaterals (12 values). For 2D data, users should preprocess 
+                 files by adding z=0 to each point.
         
     Returns:
-        numpy.ndarray: Array of vertex coordinates.
+        list: List of lists, where each sublist contains vertex coordinates for one shape.
     """
     vertices = []
     with open(filename, 'r') as file:
         for line in file:
             coords = list(map(float, line.strip().split()))
-            if len(coords) == 12:  # x, y, z for 4 vertices
+            if len(coords) % 3 == 0 and len(coords) >= 9:  # At least 3 vertices (triangle)
                 vertices.append(coords)
             else:
-                print(f"Warning: Skipping line with {len(coords)} values instead of 12")
-    return np.array(vertices)
+                print(f"Warning: Skipping line with {len(coords)} values. Expected multiple of 3 with minimum 9 values.")
+    return vertices
 
 def load_constraints_from_file(filename):
     """

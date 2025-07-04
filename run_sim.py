@@ -4,7 +4,9 @@ Simplified Kirigami Simulation Script with Auto-Expansion
 This script provides a simplified interface for kirigami simulation with spring-like forces
 for automatic expansion of contracted structures.
 
-Note: This script expects 3D vertex data (12 values per line: x,y,z for 4 vertices).
+Note: This script expects 3D vertex data with:
+      - 3*n values per line (x,y,z for 3 vertices)
+      
       For 2D data, users must preprocess files by adding z=0 to each point.
 
 Usage:
@@ -45,7 +47,7 @@ def run_simulation(args):
     
     # Configure debug visualizer - hide GUI panels for cleaner view
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)  # Hide GUI panels
-    p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 1)  # Enable shadows for better visualization
+    p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 0)  # Enable shadows for better visualization
     
     # Set up camera
     p.resetDebugVisualizerCamera(
@@ -85,14 +87,14 @@ def run_simulation(args):
         bottom_vertices = []
         
         # Create each brick
-        for i, brick_vertices in enumerate(vertices):
-            # Create brick geometry - now returns separate collision and visual indices
+        for brick_vertices in vertices:
+            # Create brick geometry - now returns visual indices
             (verts, visual_indices, center, 
              brick_bottom_vertices, brick_top_vertices, normal) = create_3d_brick(
                 brick_vertices, args.brick_thickness
             )
             
-            # Create brick body in physics engine - pass both index sets
+            # Create brick body in physics engine - pass visual indices
             brick_id = create_brick_body(verts, visual_indices, center)
             
             local_bricks.append(brick_id)
