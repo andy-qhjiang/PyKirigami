@@ -13,6 +13,9 @@ Usage:
     python run_sim.py --vertices_file cube2sphere_contracted_vertices.txt --constraints_file cube2sphere_constraints.txt --auto_expand --spring_radius 10.0 --spring_stiffness 250.0 --spring_damping 2.0 --gravity 0
 
     python run_sim.py --vertices_file rigid_3by3_vertices.txt --constraints_file rigid_3by3_constraints.txt --auto_expand --spring_radius 10.0 --spring_stiffness 100.0 --spring_damping 2.0 --angular_damping 2.5 --linear_damping 2.5 --ground_plane --gravity -100
+
+
+    python run_sim.py --vertices_file tangram_vertices.txt --constraints_file tangram_constraints.txt --angular_damping 2.5 --linear_damping 2.5 --ground_plane --gravity -100 --brick_thickness 0.2
 """
 import os
 import sys

@@ -142,8 +142,8 @@ def create_constraints_between_bricks(bricks, constraints_with_types, bottom_ver
     Args:
         bricks: List of brick body IDs
         constraints_with_types: List of constraints (f_i, v_j, f_p, v_q, type)
-                                type=0 for bottom point connection 
-                                type=1 for top point connection
+                                type=1 for bottom point connection 
+                                type=2 for top point connection
         bottom_vertices: List of bottom vertices for each brick
         top_vertices: List of top vertices for each brick
         brick_centers: List of brick center positions
@@ -174,12 +174,12 @@ def create_constraints_between_bricks(bricks, constraints_with_types, bottom_ver
             created_constraints.append(c_id)
             
 
-        if constraint_type == 0: # Spherical joint for bottom point connection
+        if constraint_type == 1: # Spherical joint for bottom point connection
             vertex_i_global_bottom = bottom_vertices[f_i][v_j]
             vertex_p_global_bottom = bottom_vertices[f_p][v_q]
             connect_points(f_i, f_p, vertex_i_global_bottom, vertex_p_global_bottom)
             
-        elif constraint_type == 1: # Spherical joint for top point connection
+        elif constraint_type == 2: # Spherical joint for top point connection
             vertex_i_global_top = top_vertices[f_i][v_j]
             vertex_p_global_top = top_vertices[f_p][v_q]
             connect_points(f_i, f_p, vertex_i_global_top, vertex_p_global_top)
