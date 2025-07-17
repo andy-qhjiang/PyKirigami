@@ -10,9 +10,8 @@ def load_vertices_from_file(filename):
     Args:
         filename: Path to the file containing 3D vertex data with n*3 values per line
                  (x,y,z for n vertices). Supports both triangles (9 values) and 
-                 quadrilaterals (12 values). For 2D data, users should preprocess 
-                 files by adding z=0 to each point.
-        
+                 quadrilaterals (12 values). For 2D data, the script will add z=0 to each point.
+
     Returns:
         list: List of lists, where each sublist contains vertex coordinates for one shape.
     """
@@ -40,7 +39,9 @@ def load_constraints_from_file(filename):
     with open(filename, 'r') as file:
         for line in file:
             parts = list(map(int, line.strip().split()))
-            if len(parts) == 5: # Old format: f_i, v_j, f_p, v_q
+            if len(parts) == 4: # Old format: f_i, v_j, f_p, v_q
+                constraints.append([parts[0]-1, parts[1]-1, parts[2]-1, parts[3]-1, 1])
+            elif len(parts) == 5: # New format: f_i, v_j, f_p, v_q, pa1
                 constraints.append([parts[0]-1, parts[1]-1, parts[2]-1, parts[3]-1, parts[4]])
             else:
                 print(f"Warning: Skipping constraint line with {len(parts)} values. Expected 4 or 5.")
