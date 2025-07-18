@@ -14,9 +14,10 @@ Usage:
 
     python run_sim.py --vertices_file rigid_3by3_vertices.txt --constraints_file rigid_3by3_constraints.txt --auto_expand --spring_radius 10.0 --spring_stiffness 100.0 --spring_damping 2.0 --angular_damping 2.5 --linear_damping 2.5 --ground_plane --gravity -100
 
-
     python run_sim.py --vertices_file tangram_vertices.txt --constraints_file tangram_constraints.txt --angular_damping 2.5 --linear_damping 2.5 --ground_plane --gravity -100 --brick_thickness 0.2
 
+    python run_sim.py --vertices_file tubular_R10_r1_w3_h3_vertices.txt --constraints_file tubular_R10_r1_w3_h3_constraints.txt --angular_damping 25 --linear_damping 25  --brick_thickness 0.05
+    
     python run_sim.py --vertices_file fan_R10_r1_w3_h3_vertices.txt --constraints_file fan_R10_r1_w3_h3_constraints.txt --angular_damping 10 --linear_damping 10 --ground_plane --gravity -100 --brick_thickness 0.1
 """
 import os
@@ -143,10 +144,6 @@ def run_simulation(args):
     
     # Define the force application function
     def apply_forces(whole_center):
-        # If auto_expand is not enabled, no forces will be applied
-        if not args.auto_expand:
-            return
-        
         force_bricks = event_handler.simulation_data['force_bricks']
         
         # Use the current brick list directly from the event handler

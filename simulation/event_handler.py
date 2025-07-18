@@ -7,7 +7,6 @@ with responsibilities split into focused components:
 - SimulationController: Handles high-level simulation operations (reset, save)
 """
 import os
-import time
 import numpy as np
 import pybullet as p
 from datetime import datetime
@@ -175,16 +174,7 @@ class EventHandler:
         
         # Create specialized components
         self.simulation_controller = SimulationController(simulation_data, simulation_functions)
-        # self.interactive_controls = InteractiveControls(simulation_data) # REMOVED: InteractiveControls managed by run_sim.py
         
-        # UI control state tracking - Removed tile1_index, tile2_index, last_constraint_removal_val
-        # self.ui_controls = {} # This was for PyBullet UI, can be removed if not used elsewhere
-        
-        # State tracking for edge detection on UI controls - Removed
-        # self.last_reset_val = 0
-        # self.last_save_val = 0
-        
-    # setup_ui_controls method removed
     
     def reset_simulation(self):
         """Reset the simulation"""
@@ -252,8 +242,10 @@ class EventHandler:
 
         whole_center = np.mean(sampled_positions, axis=0)
         
-        # Apply forces using the provided function
-        self.simulation_functions['apply_forces'](whole_center)
+        # Apply forces only if auto_expand is enabled
+        args = self.simulation_data.get('args')
+        if args and args.auto_expand:
+            self.simulation_functions['apply_forces'](whole_center)
         
         # Step simulation
         p.stepSimulation()
