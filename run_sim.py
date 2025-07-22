@@ -17,6 +17,8 @@ Usage:
     python run_sim.py --vertices_file tangram_vertices.txt --constraints_file tangram_constraints.txt --angular_damping 2.5 --linear_damping 2.5 --ground_plane --gravity -100 --brick_thickness 0.2
 
     python run_sim.py --vertices_file tubular_R10_r1_w3_h3_vertices.txt --constraints_file tubular_R10_r1_w3_h3_constraints.txt --angular_damping 25 --linear_damping 25  --brick_thickness 0.05
+
+    python run_sim.py --vertices_file cylinder_w8_h2_vertices.txt --constraints_file cylinder_w8_h2_constraints.txt --angular_damping 25 --linear_damping 25  --brick_thickness 0.05
     
     python run_sim.py --vertices_file fan_R10_r1_w3_h3_vertices.txt --constraints_file fan_R10_r1_w3_h3_constraints.txt --angular_damping 10 --linear_damping 10 --ground_plane --gravity -100 --brick_thickness 0.1
 """
