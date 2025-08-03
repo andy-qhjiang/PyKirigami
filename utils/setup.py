@@ -5,6 +5,7 @@ import pybullet as p
 import pybullet_data
 import numpy as np
 import argparse
+import sys
 
 
 def setup_physics_engine(gravity=(0, 0, -9.81), timestep=1/240, substeps=10, gui=True):
@@ -104,3 +105,42 @@ def parse_arguments():
                        help='Distance of the camera from the origin')
     
     return parser.parse_args()
+
+
+def validate_constraints(vertices, constraints, max_distance=0.1):
+    """
+    Validate that constraints in target vertices don't have excessive distances.
+    
+    This function checks if constraint endpoints in the target configuration
+    are close enough together to avoid physics instabilities.
+    
+    Args:
+        vertices: List of vertex arrays for each brick
+        constraints: List of constraint definitions [face1, vertex1, face2, vertex2, ...]
+        max_distance: Maximum allowed distance between constraint endpoints (default: 0.1)
+        
+    Raises:
+        SystemExit: If any constraint has distance > max_distance
+        
+    Returns:
+        None: Function either passes validation or exits the program
+    """
+    if vertices is None:
+        return
+        
+    for i, constraint in enumerate(constraints):
+        f1, v1, f2, v2 = constraint[:4]
+        
+        # Get vertex positions for constraint endpoints
+        pos1 = np.array(vertices[f1][3*v1:3*v1+3])
+        pos2 = np.array(vertices[f2][3*v2:3*v2+3])
+        
+        # Calculate distance using numpy
+        dist = np.linalg.norm(pos1 - pos2)
+        
+        if dist > max_distance:
+            error_msg = f"ERROR: Constraint {i} between faces {f1} and {f2} with vertices {v1} and {v2} has a large distance ({dist:.3f}) in target vertices."
+            print(error_msg)
+            print(f"This exceeds the maximum allowed distance of {max_distance:.3f} and will lead to unexpected behavior.")
+            print("Please check your target vertices file.")
+            sys.exit(1)

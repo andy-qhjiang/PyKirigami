@@ -1,8 +1,8 @@
 # PyKirigami: An Interactive Python Simulator for Kirigami Metamaterials
 
 <div align="center">
-  <img src="./gallery/cylinder_demo.gif" alt="Cylinder Demo" width="45%" />
   <img src="./gallery/partialSphere_demo.gif" alt="Partial Sphere Demo" width="45%" />
+  <img src="./gallery/cylinder_demo.gif" alt="Cylinder Demo" width="45%" />
 </div>
 
 ## Table of Contents
@@ -109,7 +109,7 @@ PyKirigami is an open-source Python toolbox for simulating the 2D and 3D deploym
 - Python 3.7 or higher
 - NumPy
 - PyBullet
-- [Add other dependencies as needed]
+
 
 ### Installation Steps
 ```bash
