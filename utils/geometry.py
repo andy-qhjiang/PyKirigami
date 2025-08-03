@@ -4,17 +4,20 @@ Geometry utilities for the kirigami simulation project.
 import numpy as np
 import pybullet as p
 
-def create_3d_brick(vertices_flat, brick_thickness):
+def create_extruded_geometry(vertices_flat, brick_thickness):
     """
-    Create a 3D brick from 3D polygon vertices (triangle or quadrilateral).
+    Create 3D extruded geometry from 2D polygon vertices.
+    
+    Takes a flat polygon and extrudes it along its normal vector to create
+    a 3D brick with all geometric data needed for PyBullet physics simulation.
     
     Args:
         vertices_flat: List of 3D vertices (n*3 values: n vertices with x,y,z)
                       Supports n-vertex polygons (such as triangles with 9 values, quadrilaterals with 12 values).
-        brick_thickness: Thickness of the brick
+        brick_thickness: Thickness of the extruded brick
         
     Returns:
-        tuple: (vertices list for PyBullet, visual_indices, center position, bottom vertices, top vertices, normal)
+        tuple: (local_verts, visual_indices, center)
     """
     # Convert to numpy array and reshape vertices
     vertices_array = np.array(vertices_flat)
@@ -41,12 +44,12 @@ def create_3d_brick(vertices_flat, brick_thickness):
     bottom_vertices = planar_vertices.copy() # Keep original vertices as bottom
 
     center = center + (brick_thickness / 2) * normal  # Center adjusted for thickness
-    # Create centered vertices list for PyBullet
-    verts = []
+    # Create centered vertices list for PyBullet (relative to center)
+    local_verts = []
     for v in bottom_vertices:
-        verts.append((v - center).tolist())
+        local_verts.append((v - center).tolist())
     for v in top_vertices:
-        verts.append((v - center).tolist())
+        local_verts.append((v - center).tolist())
     
     # Create face indices for visual shape
     visual_indices = []
@@ -68,15 +71,14 @@ def create_3d_brick(vertices_flat, brick_thickness):
         # Triangle 2: bottom[i] -> top[next_i] -> bottom[next_i] 
         visual_indices.extend([i, next_i, num_vertices + next_i])
     
-    return (verts, visual_indices, center.tolist(), 
-            bottom_vertices.tolist(), top_vertices.tolist(), normal.tolist())
+    return (local_verts, visual_indices, center.tolist())
 
-def create_brick_body(verts, visual_indices, center, mass=1.0):
+def create_brick_body(local_verts, visual_indices, center, mass=1.0):
     """
     Create a brick body in PyBullet using visual indices.
     
     Args:
-        verts: Vertices list (centered)
+        local_verts: Vertices list (relative to center)
         visual_indices: Indices list for the visual shape 
         center: Center position (world coordinates)
         mass: Mass of the brick
@@ -90,11 +92,11 @@ def create_brick_body(verts, visual_indices, center, mass=1.0):
     b = 0.922 + np.random.uniform(-0.1, 0.1)
     color = [max(0, min(1, r)), max(0, min(1, g)), max(0, min(1, b)), 1]
     
-    # Create visual shape - use double-sided indices for visibility
+    # Create visual shape
     vis_shape = p.createVisualShape(
         shapeType=p.GEOM_MESH,
-        vertices=verts,
-        indices=visual_indices, # Use double-sided indices for visibility
+        vertices=local_verts,
+        indices=visual_indices, 
         rgbaColor=color,
         specularColor=[0.4, 0.4, 0.4]
     )
@@ -103,7 +105,7 @@ def create_brick_body(verts, visual_indices, center, mass=1.0):
     # This makes PyBullet treat it as a convex hull instead of a triangle mesh
     col_shape = p.createCollisionShape(
         shapeType=p.GEOM_MESH,
-        vertices=verts
+        vertices=local_verts
         # No indices parameter - this creates a convex hull
     )
     
@@ -117,26 +119,8 @@ def create_brick_body(verts, visual_indices, center, mass=1.0):
         
     return body_id
 
-def create_point_constraint(body_id1, body_id2, pivot_in_body1, pivot_in_body2):
-    """
-    Create a point-to-point constraint between two bodies.
-    
-    Args:
-        body_id1: First body ID
-        body_id2: Second body ID
-        pivot_in_body1: Pivot point in body1's local coordinates
-        pivot_in_body2: Pivot point in body2's local coordinates
-        
-    Returns:
-        int: Constraint ID
-    """
-    return p.createConstraint(
-        body_id1, -1, body_id2, -1, 
-        p.JOINT_POINT2POINT, [0, 0, 0], 
-        pivot_in_body1, pivot_in_body2
-    )
 
-def create_constraints_between_bricks(bricks, constraints_with_types, bottom_vertices, top_vertices, brick_centers):
+def create_constraints_between_bricks(bricks, constraints_with_types, local_verts_list):
     """Create constraints between bricks based on vertex connections and type.
     
     Args:
@@ -144,9 +128,7 @@ def create_constraints_between_bricks(bricks, constraints_with_types, bottom_ver
         constraints_with_types: List of constraints (f_i, v_j, f_p, v_q, type)
                                 type=1 for bottom point connection 
                                 type=2 for top point connection
-        bottom_vertices: List of bottom vertices for each brick
-        top_vertices: List of top vertices for each brick
-        brick_centers: List of brick center positions
+        local_verts_list: List of local vertex coordinates for each brick
         
     Returns:
        list: created_constraint_ids: List of created constraint IDs
@@ -154,37 +136,37 @@ def create_constraints_between_bricks(bricks, constraints_with_types, bottom_ver
     """
     created_constraints = []
     
-    
     for f_i, v_j, f_p, v_q, constraint_type in constraints_with_types:
+        # Calculate number of bottom vertices for validation
+        num_1 = len(local_verts_list[f_i]) // 2
+        num_2 = len(local_verts_list[f_p]) // 2
+        
         # Skip invalid constraints
-        num_1 = len(bottom_vertices[f_i])
-        num_2 = len(bottom_vertices[f_p])
         if (f_i >= len(bricks) or f_p >= len(bricks) or 
-            v_j >= num_1 or v_q >= num_2): # Vertices are 0,1,2,3
+            v_j >= num_1 or v_q >= num_2):
             print(f"Warning: Skipping invalid constraint input: {(f_i, v_j, f_p, v_q, constraint_type)}")
             continue
-            
-        center_i = np.array(brick_centers[f_i])
-        center_p = np.array(brick_centers[f_p])
 
-        def connect_points(body1_idx, body2_idx, vert1_global_coords, vert2_global_coords):
-            pivot_in_1 = (np.array(vert1_global_coords) - center_i).tolist()
-            pivot_in_2 = (np.array(vert2_global_coords) - center_p).tolist()
-            c_id = create_point_constraint(bricks[body1_idx], bricks[body2_idx], pivot_in_1, pivot_in_2)
-            created_constraints.append(c_id)
+        if constraint_type == 1: # Bottom point connection
+            # Bottom vertices are first half of local_verts
+            pivot_in_1 = local_verts_list[f_i][v_j]
+            pivot_in_2 = local_verts_list[f_p][v_q]
             
-
-        if constraint_type == 1: # Spherical joint for bottom point connection
-            vertex_i_global_bottom = bottom_vertices[f_i][v_j]
-            vertex_p_global_bottom = bottom_vertices[f_p][v_q]
-            connect_points(f_i, f_p, vertex_i_global_bottom, vertex_p_global_bottom)
+        elif constraint_type == 2: # Top point connection
+            # Top vertices are second half of local_verts
+            pivot_in_1 = local_verts_list[f_i][num_1 + v_j]
+            pivot_in_2 = local_verts_list[f_p][num_2 + v_q]
             
-        elif constraint_type == 2: # Spherical joint for top point connection
-            vertex_i_global_top = top_vertices[f_i][v_j]
-            vertex_p_global_top = top_vertices[f_p][v_q]
-            connect_points(f_i, f_p, vertex_i_global_top, vertex_p_global_top)
         else:
             print(f"Warning: Unknown constraint type {constraint_type} for constraint {(f_i, v_j, f_p, v_q)}. Skipping.")
             continue
+            
+        # Create constraint directly using local coordinates
+        c_id = p.createConstraint(
+            bricks[f_i], -1, bricks[f_p], -1, 
+            p.JOINT_POINT2POINT, [0, 0, 0], 
+            pivot_in_1, pivot_in_2
+        )
+        created_constraints.append(c_id)
             
     return created_constraints

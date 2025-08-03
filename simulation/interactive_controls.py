@@ -7,6 +7,12 @@ allowing users to fix or unfix bricks by clicking on them.
 import pybullet as p
 import numpy as np
 import math # Ensure math is imported if used for normalization, though it was commented out
+from utils.physics_utils import (
+    fix_object_to_world, 
+    unfix_object_from_world, 
+    create_visual_indicator, 
+    remove_visual_indicator
+)
 
 
 
@@ -54,22 +60,8 @@ class InteractiveControls:
         if hit_position is None:
             hit_position = pos
         
-        # Create indicator visual (red sphere)
-        visual_shape = p.createVisualShape(
-            shapeType=p.GEOM_SPHERE,
-            radius=0.08,
-            rgbaColor=[1, 0, 0, 0.8]
-        )
-   
-        indicator_id = p.createMultiBody(
-            baseMass=0,  # Zero mass so physics don't affect it
-            baseVisualShapeIndex=visual_shape,
-            basePosition=hit_position,
-            baseOrientation=[0, 0, 0, 1],
-            useMaximalCoordinates=True
-        )
-        
-        return indicator_id
+        # Use the utility function to create indicator
+        return create_visual_indicator(hit_position)
     
     def toggle_static(self, object_id, hit_position=None):
         """
@@ -84,35 +76,16 @@ class InteractiveControls:
         """
         if object_id in self.fixed_objects:
             # Object is static - make it dynamic again
-            
-            p.removeConstraint(self.fixed_objects[object_id]['constraint_id'])
-            p.removeBody(self.fixed_objects[object_id]['indicator_id'])
+            unfix_object_from_world(self.fixed_objects[object_id]['constraint_id'])
+            remove_visual_indicator(self.fixed_objects[object_id]['indicator_id'])
                 
             # Remove from fixed objects dictionary
             del self.fixed_objects[object_id]
             print(f"Brick {object_id} is free.")
    
         else: # Object is dynamic - make it static
-            # Get the current position and orientation before fixing
-            pos, orn = p.getBasePositionAndOrientation(object_id)
-            
-            # Create fixed constraint to world frame
-        
-            constraint_id = p.createConstraint(
-                parentBodyUniqueId=object_id,
-                parentLinkIndex=-1,
-                childBodyUniqueId=-1,  # World frame
-                childLinkIndex=-1,
-                jointType=p.JOINT_FIXED,
-                jointAxis=[0, 0, 0],
-                parentFramePosition=[0, 0, 0],  # Relative to object's CoM
-                childFramePosition=pos,         # Target position in world
-                parentFrameOrientation=[0,0,0,1], # Relative orientation
-                childFrameOrientation=orn         # Target orientation in world
-            )
-            
-            # Ensure very high max force for stability
-            p.changeConstraint(constraint_id, maxForce=1e10) # Significantly increased maxForce
+            # Use utility function to fix object to world
+            constraint_id = fix_object_to_world(object_id)
             
             # Create visual indicator
             indicator_id = self.create_static_indicator(object_id, hit_position)
@@ -124,8 +97,8 @@ class InteractiveControls:
             }
             
             print(f"Brick {object_id} is fixed.")
-                
-           
+            
+        return object_id in self.fixed_objects
             
     def process_mouse_events(self):
         """
@@ -222,21 +195,12 @@ class InteractiveControls:
         """
         Reset all fixed objects to dynamic state and remove indicators.
         """
-
         fixed_ids = list(self.fixed_objects.keys())
         
         for object_id in fixed_ids:
-            # Remove constraint first
-            try:
-                p.removeConstraint(self.fixed_objects[object_id]['constraint_id'])
-            except Exception as e:
-                print('cannot remove constraint: %s', e)  # Constraint might have been removed
-            
-            # Remove indicator
-            try:
-                p.removeBody(self.fixed_objects[object_id]['indicator_id'])
-            except Exception as e:
-                print('cannot remove indicator when resetting: %s', e)
+            # Remove constraint and indicator using utility functions
+            unfix_object_from_world(self.fixed_objects[object_id]['constraint_id'])
+            remove_visual_indicator(self.fixed_objects[object_id]['indicator_id'])
             
             # Remove from dictionary
             del self.fixed_objects[object_id]

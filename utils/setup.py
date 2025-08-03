@@ -29,7 +29,16 @@ def setup_physics_engine(gravity=(0, 0, -9.81), timestep=1/240, substeps=10, gui
     p.setPhysicsEngineParameter(fixedTimeStep=timestep, numSubSteps=substeps)
     
     # Disable profiling to prevent generation of timings_*.json files
-    p.setPhysicsEngineParameter(enableFileCaching=0, reportSolverAnalytics=0, deterministicOverlappingPairs=1)
+    p.setPhysicsEngineParameter(
+        enableFileCaching=0, 
+        reportSolverAnalytics=0, 
+        deterministicOverlappingPairs=1,
+        enableConeFriction=0  # Additional performance improvement
+    )
+    
+    # # Explicitly disable timing file generation  
+    # p.configureDebugVisualizer(p.COV_ENABLE_TINY_RENDERER, 0)
+    # p.configureDebugVisualizer(p.COV_ENABLE_PROFILER, 0)
     
     return client_id
 
@@ -64,7 +73,7 @@ def parse_arguments():
     # Input files
     parser.add_argument('--vertices_file', required=True, help='File containing vertex data')
     parser.add_argument('--constraints_file', required=True, help='File with connectivity constraints')
-    parser.add_argument('--force_bricks_file', help='File with specific bricks to apply forces to (optional)')
+    parser.add_argument('--target_vertices_file', help='File containing target vertex positions for deployment (optional)')
     
     # Physics simulation parameters
     parser.add_argument('--gravity', type=float, default=0, help='Gravity constant')
@@ -72,15 +81,11 @@ def parse_arguments():
     parser.add_argument('--substeps', type=int, default=20, help='Physics substeps per step')
     
     
-    # Expansion parameters
-    parser.add_argument('--auto_expand', action='store_true',
-                       help='Automatically expand the structure using spring-like forces')
-    parser.add_argument('--spring_radius', type=float, default=5.0,
-                       help='Target radius for spring expansion')
-    parser.add_argument('--spring_stiffness', type=float, default=100.0,
-                       help='Stiffness coefficient for spring forces')
-    parser.add_argument('--spring_damping', type=float, default=5.0,
-                       help='Damping coefficient for spring forces')
+    # Target-based deployment parameters
+    parser.add_argument('--target_stiffness', type=float, default=500.0,
+                       help='Stiffness coefficient for target-based forces')
+    parser.add_argument('--target_damping', type=float, default=50.0,
+                       help='Damping coefficient for target-based forces')
     
     
     
@@ -89,9 +94,13 @@ def parse_arguments():
                        help='Thickness of the brick (z-height)')
     parser.add_argument('--linear_damping', type=float, default=1, help='Linear damping')
     parser.add_argument('--angular_damping', type=float, default=1, help='Angular damping')
+    
+    
   
     # Visual options
     parser.add_argument('--ground_plane', action='store_true',
                        help='Add a ground plane to the simulation')
+    parser.add_argument('--camera_distance', type=float, default=8.0,
+                       help='Distance of the camera from the origin')
     
     return parser.parse_args()

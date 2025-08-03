@@ -9,7 +9,9 @@ with responsibilities split into focused components:
 import os
 import numpy as np
 import pybullet as p
+import time
 from datetime import datetime
+from utils.physics_utils import fix_multiple_objects_to_world, unfix_multiple_objects_from_world
 
 class SimulationController:
     """Handles high-level simulation operations like reset and saving."""
@@ -25,6 +27,7 @@ class SimulationController:
         self.simulation_data = simulation_data
         self.simulation_functions = simulation_functions
         self.is_paused = False  # Track pause state
+        self.pause_constraints = {}  # Store constraints for paused objects
     
     def reset_simulation(self):
         """
@@ -40,10 +43,10 @@ class SimulationController:
             except:
                 pass
         
-        # # Give time for physics engine to process removals
-        # for _ in range(20):
-        #     p.stepSimulation()
-        #     time.sleep(0.01)
+        # Give time for physics engine to process removals
+        for _ in range(20):
+            p.stepSimulation()
+            time.sleep(0.01)
         
         # Reinitialize with the original data
         sim_data = self.simulation_functions['initialize_simulation']()
@@ -101,53 +104,34 @@ class SimulationController:
     def toggle_pause(self):
         """
         Toggle pause state of the simulation.
-        When paused, all objects are frozen in place.
+        When paused, all objects are frozen in place using fixed constraints.
         
         Returns:
             bool: Current pause state (True if paused, False if running)
         """
         try:
             if not self.is_paused:
-                # Pause the simulation
+                # Pause the simulation by fixing all bricks to world frame
                 print("Pausing simulation...")
                 
-                # Save current velocities and set them to zero
-                for brick_id in self.simulation_data['bricks']:
-                    try:
-                        
-                        # Stop the brick by setting velocity to zero
-                        p.resetBaseVelocity(brick_id, [0, 0, 0], [0, 0, 0])
-                        
-                        # Temporarily increase damping to maximum to prevent movement
-                        p.changeDynamics(brick_id, -1, 
-                                       linearDamping=100.0, 
-                                       angularDamping=100.0)
-                    except Exception as e:
-                        print(f"Warning: Could not pause brick {brick_id}: {e}")
+                self.pause_constraints = fix_multiple_objects_to_world(
+                    self.simulation_data['bricks']
+                )
                 
                 self.is_paused = True
-                print("Simulation paused. Press 'P' again to resume.")
+                print(f"Simulation paused. Fixed {len(self.pause_constraints)} objects. Press 'P' again to resume.")
                 
             else:
-                # Resume the simulation
+                # Resume the simulation by removing all constraints
                 print("Resuming simulation...")
                 
-                # Restore original damping and velocities
-                args = self.simulation_data.get('args')
-                linear_damping = args.linear_damping if args else 2.5
-                angular_damping = args.angular_damping if args else 2.5
+                success = unfix_multiple_objects_from_world(self.pause_constraints)
+                if success:
+                    print(f"Resumed simulation. Released {len(self.pause_constraints)} objects.")
+                else:
+                    print("Warning: Some constraints could not be removed during resume.")
                 
-                for brick_id in self.simulation_data['bricks']:
-                    try:
-                        # Restore original damping
-                        p.changeDynamics(brick_id, -1, 
-                                       linearDamping=linear_damping, 
-                                       angularDamping=angular_damping)
-                        
-                    except Exception as e:
-                        print(f"Warning: Could not resume brick {brick_id}: {e}")
-                
-                
+                self.pause_constraints = {}  # Clear the constraints dict
                 self.is_paused = False
                 print("Simulation resumed.")
             
@@ -187,7 +171,6 @@ class EventHandler:
         # Update data in all components
         self.simulation_data = new_sim_data
         self.simulation_controller.simulation_data = new_sim_data
-        # self.interactive_controls.update_simulation_data(new_sim_data) # REMOVED: Handled in run_sim.py
             
         return new_sim_data
     
@@ -232,20 +215,12 @@ class EventHandler:
             p.stepSimulation()
             return
 
-        # Get positions efficiently in batch
-        sampled_positions = [p.getBasePositionAndOrientation(brick_id)[0] 
-                           for brick_id in sampled_bricks]
         
-        if not sampled_positions: # If somehow still empty
-            p.stepSimulation()
-            return
-
-        whole_center = np.mean(sampled_positions, axis=0)
         
-        # Apply forces only if auto_expand is enabled
-        args = self.simulation_data.get('args')
-        if args and args.auto_expand:
-            self.simulation_functions['apply_forces'](whole_center)
+        # Apply forces only if target-based deployment is enabled
+        args = self.simulation_data.get('args', False)
+        if args and args.target_vertices_file:
+            self.simulation_functions['apply_forces']()
         
         # Step simulation
         p.stepSimulation()
