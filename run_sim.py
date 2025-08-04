@@ -11,7 +11,7 @@ Note: This script expects 3D vertex data with:
 
 Usage:
     # Basic simulation with physics only (no deployment forces)
-    python run_sim.py --vertices_file fan_R10_r1_w3_h3_vertices.txt --constraints_file fan_R10_r1_w3_h3_constraints.txt  --ground_plane --gravity -100 --brick_thickness 0.1
+    python run_sim.py --vertices_file fan_R10_r1_w3_h3_vertices.txt --constraints_file fan_R10_r1_w3_h3_constraints.txt  --ground_plane --gravity -200 --brick_thickness 0.1
 
     python run_sim.py --vertices_file tangram_vertices.txt --constraints_file tangram_constraints.txt --ground_plane --gravity -100 --brick_thickness 0.1
 

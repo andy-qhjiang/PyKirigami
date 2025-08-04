@@ -547,12 +547,6 @@ python run_sim.py \
 - **Error**: Target file has different number of tiles than initial vertices
 - **Solution**: Ensure target vertices file has exactly same number of lines as vertices file
 
-#### Invalid Vertex Indices
-- **Error**: Constraint file references non-existent vertices
-- **Solution**: 
-  - Check vertex indices are 0-based and within bounds
-  - Verify each tile has sufficient vertices for constraint references
-  - Use `python -c "import utils.load_data; utils.load_data.validate_files('vertices.txt', 'constraints.txt')"` to check
 
 #### Parsing Errors
 - **Error**: "could not convert string to float" or similar
@@ -566,8 +560,8 @@ python run_sim.py \
 #### Constraint Violations
 - **Symptoms**: Connected tiles separate or behave unexpectedly
 - **Solutions**:
-  - Check constraint distances in target configuration using built-in validation
-  - Ensure constraint endpoints are close in target vertices (< 0.1 units apart)
+  - Check constraint distances in target configuration using built-in validation: `python -c "from utils.setup import validate_constraints; from utils.setup import load_vertices_from_file, load_constraints_from_file; validate_constraints(load_vertices_from_file('vertices/target_vertices.txt'), load_constraints_from_file('constraints.txt'))"`
+  - Such error usually happens when one makes mistake on vertex order of faces and we have integrate validation into out project
   - Verify constraint types (1 vs 2) match intended connection points
 
 #### Rigid Body Interpenetration
@@ -677,7 +671,6 @@ The simulator is organized into a modular architecture with clear separation of 
   - `fix_object_to_world()` / `unfix_object_from_world()`: Object constraint management
   - `fix_multiple_objects_to_world()`: Batch operations for pause functionality
   - `create_visual_indicator()` / `remove_visual_indicator()`: Visual feedback system
-  - `validate_constraints()`: Target configuration validation
   - `setup_physics_engine()`: PyBullet initialization with optimized parameters
 
 - **`geometry.py`**: 3D geometry calculations and mesh generation
@@ -687,14 +680,11 @@ The simulator is organized into a modular architecture with clear separation of 
   - Normal vector computation and coordinate system management
 
 - **`setup.py`**: Configuration and argument parsing
+  - `load_vertices_from_file()` / `load_constraints_from_file()`: Input file parsing
+  - `validate_constraints()`: constraint validation to ensure compatibility
   - `parse_arguments()`: Command-line interface definition
-  - File path resolution and validation
   - Parameter default value management
 
-- **`load_data.py`**: File I/O and data processing
-  - `load_vertices_from_file()` / `load_constraints_from_file()`: Input file parsing
-  - `create_visual_mesh()`: Mesh generation for rendering
-  - Data validation and error handling
 
 #### Main Entry Point
 - **`run_sim.py`**: Application entry point and simulation orchestration
