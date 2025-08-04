@@ -11,14 +11,14 @@ Note: This script expects 3D vertex data with:
 
 Usage:
     # Basic simulation with physics only (no deployment forces)
-    python run_sim.py --vertices_file tangram_vertices.txt --constraints_file tangram_constraints.txt --angular_damping 2.5 --linear_damping 2.5 --ground_plane --gravity -100 --brick_thickness 0.2
+    python run_sim.py --vertices_file fan_R10_r1_w3_h3_vertices.txt --constraints_file fan_R10_r1_w3_h3_constraints.txt  --ground_plane --gravity -100 --brick_thickness 0.1
+
+    python run_sim.py --vertices_file tangram_vertices.txt --constraints_file tangram_constraints.txt --ground_plane --gravity -100 --brick_thickness 0.1
 
     # Target-based deployment examples:
     python run_sim.py --vertices_file cylinder_vertices.txt --constraints_file cylinder_constraints.txt --target_vertices_file cylinder_target.txt  --brick_thickness 0.1 --camera_distance 15
 
-    python run_sim.py --vertices_file cube2sphere_w4_h4_vertices.txt --constraints_file cube2sphere_w4_h4_constraints.txt --target_vertices_file cube2sphere_w4_h4_target.txt  --target_stiffness 500.0 --target_damping 10.0 --angular_damping 2.5 --linear_damping 2.5 --brick_thickness 0.02
-    
-    python run_sim.py --vertices_file fan_R10_r1_w3_h3_vertices.txt --constraints_file fan_R10_r1_w3_h3_constraints.txt  --ground_plane --gravity -100 --brick_thickness 0.1
+    python run_sim.py --vertices_file cube2sphere_w4_h4_vertices.txt --constraints_file cube2sphere_w4_h4_constraints.txt --target_vertices_file cube2sphere_w4_h4_target.txt --brick_thickness 0.02
 
     python run_sim.py --vertices_file partialSphere_vertices.txt --constraints_file partialSphere_constraints.txt --target_vertices_file partialSphere_target.txt  --brick_thickness 0.02
 """

@@ -27,7 +27,7 @@ class InteractiveControls:
         self.simulation_data = simulation_data
         
         # Dictionary to track fixed objects
-        self.fixed_objects = {}  # {body_id: (original_mass, indicator_id)}
+        self.fixed_objects = {}  # {body_id: (constraint_id, indicator_id)}
 
     def update_simulation_data(self, simulation_data):
         """

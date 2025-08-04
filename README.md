@@ -90,7 +90,7 @@ PyKirigami is an open-source Python toolbox for simulating the 2D and 3D deploym
 - **Physics-based simulation**: Powered by PyBullet for realistic physics behavior
 - **Interactive controls**: Real-time manipulation and parameter adjustment
 - **Flexible input format**: Support for arbitrary polygonal tiles and connection patterns
-- **Multiple connection types**: Spherical joints, hinge connections, and rigid connections
+- **Multiple connection types**: Spherical joints, Fixed joints
 - **Automated and manual deployment**: Both programmatic and interactive force application
 - **Real-time visualization**: 3D rendering with camera controls and visual feedback
 
@@ -118,32 +118,50 @@ git clone [repository-url]
 cd Kirigami_simulation_3D
 
 # Install dependencies
-pip install -r requirements.txt
-
-# Run a test simulation
-python run_sim.py --vertices_file data/tangram_vertices.txt --constraints_file data/tangram_constraints.txt
+pip install numpy pybullet
 ```
 
----
+**Note**: You may encounter issues when installing PyBullet through pip, as it requires C++ dependencies to compile source files. For a smoother installation experience, we recommend using a conda environment with conda-forge, which provides pre-compiled and compitable packages. 
+
+```bash
+# Alternative installation using conda
+conda create -n kirigami python=3.13
+conda activate kirigami
+conda install -c conda-forge numpy pybullet
+```
+
+# Run a test simulation
 
 ## Quick Start
 
-### Basic Usage Example
+### Target-Based Deployment (Recommended)
+```bash
+python run_sim.py \
+    --vertices_file data/partialSphere_vertices.txt \
+    --constraints_file data/partialSphere_constraints.txt \
+    --target_vertices_file data/partialSphere_target.txt \
+    --brick_thickness 0.02
+```
+
+### Basic Physics Simulation
 ```bash
 python run_sim.py \
     --vertices_file data/tangram_vertices.txt \
     --constraints_file data/tangram_constraints.txt \
-    --brick_thickness 0.1 \
-    --auto_expand \
-    --spring_radius 5.0 \
-    --spring_stiffness 100.0
+    --angular_damping 2.5 \
+    --linear_damping 2.5 \
+    --ground_plane \
+    --gravity -100 \
+    --brick_thickness 0.2
 ```
 
 ### Running Your First Simulation
-1. Prepare your input files (vertices and constraints)
-2. Run the simulation with basic parameters
+1. Prepare your input files (vertices, constraints, and optionally target vertices)
+2. Run the simulation with basic parameters (default stiffness and damping are optimized)
 3. Use mouse and keyboard controls to interact
 4. Save simulation state when desired
+
+**Note**: The default `target_stiffness` (500.0) and `target_damping` (50.0) parameters are carefully tuned for stable deployment. Advanced users can adjust these for specific behaviors.
 
 ---
 
@@ -173,7 +191,7 @@ x1 y1 z1 x2 y2 z2 x3 y3 z3 ... xn yn zn
 - Each tile can have different numbers of vertices
 
 ### Constraints File Format
-**Purpose**: Defines connections between kirigami tiles
+**Purpose**: Defines point-to-point connections between kirigami tiles
 
 **Format**: Each line specifies a connection between two tiles
 ```
@@ -183,58 +201,68 @@ tile1_index vertex1_index tile2_index vertex2_index connection_type
 **Connection Types**:
 - `1`: Bottom vertex connection (spherical joint)
 - `2`: Top vertex connection (spherical joint)
-- If type is omitted, defaults to bottom connection
 
 **Example**:
 ```
 0 0 1 1 1
 0 1 1 2 2
+2 3 3 0 1
 ```
 
-### Force Bricks File Format (Optional)
-**Purpose**: Specifies which tiles should receive targeted forces
+**Important Notes**:
+- All connections are implemented as point-to-point constraints
+- Tile indices and vertex indices refer to the order in the corresponding file (1-indexed)
+- Connection type determines whether bottom or top face vertices are connected, the program will create bottom vertex connection if there is no specific assignment like connection [p,i,q,j] without type.
+- All indices are converted to 0-based internally (subtract 1 from 1-based indices)
 
-**Format**: One tile index per line
+### Target Vertices File Format (Optional)
+**Purpose**: Defines the desired final configuration for target-based deployment
+
+**Format**: Same as vertices file - each line represents the target shape of each tile
 ```
-0
-2
-5
+x1 y1 z1 x2 y2 z2 x3 y3 z3 ... xn yn zn
 ```
+
+**Requirements**:
+- Must have the same number of tiles as the initial vertices file
+- Each tile must have the same number of vertices as in the initial configuration
+- Vertex order must match the initial configuration
+- Constraint endpoints in target configuration should be close together (< 0.1 units)
 
 ---
 
 ## Command-Line Arguments
 
 ### Required Arguments
-- `--vertices_file`: Path to vertices definition file
+- `--vertices_file`: Path to initial vertices definition file
 - `--constraints_file`: Path to constraints definition file
 
 ### Physics Parameters
-- `--gravity`: Gravitational acceleration (default: -9.81)
-- `--timestep`: Physics simulation timestep
-- `--substeps`: Number of physics substeps per frame
+- `--gravity`: Gravitational acceleration (default: 0)
+- `--timestep`: Physics simulation timestep (default: 1/240)
+- `--substeps`: Number of physics substeps per frame (default: 20)
 
-### Expansion Parameters
-- `--auto_expand`: Enable automatic expansion forces
-- `--spring_radius`: Target expansion radius
-- `--spring_stiffness`: Spring force stiffness coefficient
-- `--spring_damping`: Spring damping coefficient
+### Target-Based Deployment Parameters
+- `--target_vertices_file`: Path to target vertices configuration file
+- `--target_stiffness`: Spring stiffness for target forces (default: 500.0)
+- `--target_damping`: Damping coefficient for target forces (default: 50.0)
 
 ### Geometry Parameters
-- `--brick_thickness`: Thickness of extruded 3D tiles
+- `--brick_thickness`: Thickness of extruded 3D tiles (default: 0.02)
 
 ### Damping Parameters
-- `--linear_damping`: Linear velocity damping
-- `--angular_damping`: Angular velocity damping
+- `--linear_damping`: Linear velocity damping (default: 1)
+- `--angular_damping`: Angular velocity damping (default: 1)
 
 ### Visual Options
 - `--ground_plane`: Add collision ground plane
+- `--camera_distance`: Initial camera distance from origin (default: 8.0)
 
 ---
 
 ## 3D Tile Geometry and Normal Vector Orientation
 
-### Understanding Normal Vector Calculation
+### Understanding Normal Vector Calculation To Extrude Face
 The normal vector is computed using the cross product of the first two edge vectors:
 ```
 n = (v1 - v0) × (v2 - v0) / ||(v1 - v0) × (v2 - v0)||
@@ -257,7 +285,7 @@ n = (v1 - v0) × (v2 - v0) / ||(v1 - v0) × (v2 - v0)||
 
 ---
 
-## Inter-Tile Connections
+## Inter-Tile and Tile-World Connections
 
 ### Connection Types
 
@@ -273,43 +301,80 @@ n = (v1 - v0) × (v2 - v0) / ||(v1 - v0) × (v2 - v0)||
 - **Behavior**: Single-axis rotation
 - **Use case**: Door hinges, folding mechanisms
 
-#### Rigid Connections
-- **Implementation**: Multiple constraints eliminating all relative motion
-- **Configuration**: Four or more constraint points
-- **Behavior**: No relative motion between tiles
-- **Use case**: Welded joints, solid assemblies
-
-### Constraint File Specification
-[Detailed explanation of constraint syntax and examples]
-
-### Best Practices for Defining Connections
-[Guidelines for creating robust and predictable connections]
+#### Fixed Connections
+- **Implementation**: PyBullet `JOINT_FIXED` constraints that eliminate all degrees of freedom
+- **Tile-to-World**: Uses `fix_object_to_world()` to anchor tiles to world frame at current position/orientation
+- **Configuration**: Applied programmatically through interactive controls (right-click) or pause mechanism
+- **Behavior**: Complete immobilization - no translation or rotation
+- **Use case**: Temporary anchoring, pause functionality, user-controlled tile fixing
+- **Technical details**: 
+  - Constraint created with `p.createConstraint()` using `p.JOINT_FIXED` type
+  - High maximum force (`1e10`) ensures rigid attachment
+  - Preserves current position and orientation when applied
+  - Removable via `unfix_object_from_world()` to restore dynamics
+- **Visual feedback**: Red sphere indicators show fixed tiles in interactive mode
 
 ---
 
 ## Force Models and Deployment Mechanisms
 
-### Automatic Expansion Forces
-**Formula**: `F = k(r-d) - μv`
-- `k`: Spring stiffness
-- `r`: Target radius
-- `d`: Current distance from center
-- `μ`: Damping coefficient
-- `v`: Velocity magnitude
+### Target-Based Deployment Forces
 
-### Manual Force Application
-- Left-click dragging for direct manipulation
-- Force magnitude depends on drag distance and duration
+The simulator uses a sophisticated vertex-based force model to guide kirigami structures toward their target configurations. This system operates by applying forces to individual vertices and computing the resultant forces and torques for each tile.
+
+#### Vertex-Based Force Calculation
+**Individual Vertex Force**: For each vertex `i`:
+```
+F_i = k × (target_position_i - current_position_i)
+```
+
+**Net Force on Tile**: Sum of all vertex forces:
+```
+F_net = Σ F_i - μ_linear × v_linear
+```
+
+**Net Torque on Tile**: Cross product of position vectors and forces:
+```
+τ_net = Σ (r_i × F_i) - μ_angular × v_angular
+```
+
+Where:
+- `k`: Target stiffness parameter (`target_stiffness`, default: 500.0)
+- `μ_linear`: Linear damping coefficient (`target_damping`, default: 50.0)
+- `μ_angular`: Angular damping from system parameters
+- `r_i`: Vector from tile center to vertex `i`
+- `v_linear`, `v_angular`: Linear and angular velocities
+
+#### Real-Time Coordinate Transformation
+The system dynamically computes current vertex positions by transforming local coordinates to world coordinates:
+```
+world_vertex_i = R × local_vertex_i + center_position
+```
+Where `R` is the rotation matrix derived from the tile's current orientation quaternion.
+
+#### Force Application Process
+1. **Vertex Position Update**: Transform local bottom vertices to current world coordinates
+2. **Force Calculation**: Compute individual vertex forces toward target positions
+3. **Force Summation**: Calculate net force and torque for each tile
+4. **Damping Application**: Apply velocity-proportional damping
+5. **Physics Integration**: Apply forces and torques through PyBullet
 
 ### Environmental Forces
-- **Gravity**: Configurable magnitude and direction
-- **Damping**: Linear and angular velocity reduction
-- **Ground plane**: Optional collision surface
+- **Gravity**: Configurable magnitude and direction (default: 0, disabled)
+- **System Damping**: Linear and angular velocity reduction (`linear_damping`, `angular_damping`)
+- **Ground Plane**: Optional collision surface for realistic physics interaction
+
+### Manual Interaction Forces
+- **Right-click fixing**: Uses constraint-based object fixing (see Interactive Controls)
+- **Physics manipulation**: Direct interaction through PyBullet's built-in camera controls
+- **Pause mechanism**: Constraint-based freezing of all objects
 
 ### Parameter Tuning Guidelines
-- Start with low stiffness values and increase gradually
-- Balance expansion force with damping for stability
-- Adjust timestep for numerical stability
+- **Start with defaults**: `target_stiffness=500.0`, `target_damping=50.0` are optimized for most cases
+- **Increase stiffness**: 750-1000 for faster deployment (monitor stability)
+- **Increase damping**: 75-150 if oscillations occur
+- **Adjust timestep**: Smaller values (1/480) for high-stiffness simulations
+- **Balance forces**: Higher stiffness requires proportional damping increase
 
 ---
 
@@ -341,14 +406,98 @@ n = (v1 - v0) × (v2 - v0) / ||(v1 - v0) × (v2 - v0)||
 
 ## Example Projects
 
-### 2D-to-2D Deployments
-[Step-by-step examples with input files and expected results]
+### Target-Based Deployments (Recommended)
 
-### 2D-to-3D Deployments
-[Examples showing flat-to-3D transformations]
+#### Partial Sphere Deployment
+```bash
+python run_sim.py \
+    --vertices_file data/partialSphere_vertices.txt \
+    --constraints_file data/partialSphere_constraints.txt \
+    --target_vertices_file data/partialSphere_target.txt \
+    --brick_thickness 0.02
+```
+*Uses default optimized parameters: `target_stiffness=500.0`, `target_damping=50.0`*
 
-### 3D-to-3D Deployments
-[Complex 3D shape transformations]
+#### Cylinder Formation
+```bash
+python run_sim.py \
+    --vertices_file data/cylinder_w8_h2_vertices.txt \
+    --constraints_file data/cylinder_w8_h2_constraints.txt \
+    --target_vertices_file data/cylinder_target.txt \
+    --brick_thickness 0.1 \
+    --camera_distance 15
+```
+*Default parameters work well for most cylinder deployments*
+
+
+### Basic Physics Simulations
+
+#### Tangram Puzzle with Gravity
+```bash
+python run_sim.py \
+    --vertices_file data/tangram_vertices.txt \
+    --constraints_file data/tangram_constraints.txt \
+    --angular_damping 2.5 \
+    --linear_damping 2.5 \
+    --ground_plane \
+    --gravity -100 \
+    --brick_thickness 0.2
+```
+*Higher damping prevents excessive bouncing under gravity*
+
+#### Fan Structure for Interactive Manipulation
+```bash
+python run_sim.py \
+    --vertices_file data/fan_R10_r1_w3_h3_vertices.txt \
+    --constraints_file data/fan_R10_r1_w3_h3_constraints.txt \
+    --ground_plane \
+    --gravity -100 \
+    --brick_thickness 0.1
+```
+*Good for testing interactive controls and manual manipulation*
+
+### Parameter Tuning Examples
+
+#### High-Stiffness Deployment (Fast but Potentially Unstable)
+```bash
+python run_sim.py \
+    --vertices_file data/partialSphere_vertices.txt \
+    --constraints_file data/partialSphere_constraints.txt \
+    --target_vertices_file data/partialSphere_target.txt \
+    --target_stiffness 1000.0 \
+    --target_damping 75.0 \
+    --brick_thickness 0.02
+```
+
+#### Low-Stiffness Deployment (Very Stable but slow and even cannnot be deployed)
+```bash
+python run_sim.py \
+    --vertices_file data/partialSphere_vertices.txt \
+    --constraints_file data/partialSphere_constraints.txt \
+    --target_vertices_file data/partialSphere_target.txt \
+    --target_stiffness 200.0 \
+    --target_damping 25.0 \
+    --brick_thickness 0.02
+```
+
+#### High-Precision Simulation (Smaller Timestep)
+```bash
+python run_sim.py \
+    --vertices_file data/cube2sphere_w4_h4_vertices.txt \
+    --constraints_file data/cube2sphere_w4_h4_constraints.txt \
+    --target_vertices_file data/cube2sphere_w4_h4_target.txt \
+    --timestep 0.00208 \
+    --substeps 30 \
+    --target_stiffness 750.0
+```
+**Note**: The value 0.00208 represents 1/480, which requires decimal input via command line (e.g., `--timestep 0.002083`). Be aware that smaller timesteps significantly increase computational cost while potentially providing diminishing returns in simulation accuracy.
+
+
+**Key Parameter Guidelines:**
+- **Default parameters** (`target_stiffness=500.0`, `target_damping=50.0`) work for most simulations
+- **Increase stiffness** (750-1000) for faster deployment, but monitor stability
+- **Increase damping** (75-150) if oscillations occur
+- **Adjust timestep** (1/480 to 1/120) based on stability vs. performance needs
 
 ---
 
@@ -358,7 +507,144 @@ n = (v1 - v0) × (v2 - v0) / ||(v1 - v0) × (v2 - v0)||
 ---
 
 ## Troubleshooting
-[Common problems and solutions]
+
+### Common Simulation Issues
+
+#### Unstable Simulation
+- **Symptoms**: Objects jittering, exploding, or moving erratically
+- **Solutions**: 
+  - Reduce `target_stiffness` from default 500.0 to 100.0-300.0
+  - Increase `target_damping` from default 50.0 to 75.0-100.0
+  - Decrease physics `timestep` to 1/480 or smaller
+  - Increase `substeps` to 30-50 for better numerical stability
+
+#### Slow or No Deployment
+- **Symptoms**: Target-based deployment progresses very slowly or stalls
+- **Solutions**:
+  - Increase `target_stiffness` gradually (try 750.0-1000.0)
+  - Ensure target vertices file is correctly formatted
+  - Check that target configuration is physically achievable
+  - Verify constraint connections allow required movement
+
+#### Objects Fall Through Ground
+- **Symptoms**: Simulation objects pass through the ground plane
+- **Solutions**:
+  - Enable `--ground_plane` option
+  - Check that gravity is set appropriately (try `--gravity -100`)
+  - Increase collision margin in physics settings
+
+#### Excessive Oscillation
+- **Symptoms**: Objects vibrate or oscillate around target positions
+- **Solutions**:
+  - Increase `target_damping` to 75.0-150.0
+  - Increase system damping: `--linear_damping 2.5 --angular_damping 2.5`
+  - Reduce `target_stiffness` for gentler convergence
+  - Check timestep is appropriate for force magnitudes
+
+### File Format Errors
+
+#### Vertex Count Mismatch
+- **Error**: Target file has different number of tiles than initial vertices
+- **Solution**: Ensure target vertices file has exactly same number of lines as vertices file
+
+#### Invalid Vertex Indices
+- **Error**: Constraint file references non-existent vertices
+- **Solution**: 
+  - Check vertex indices are 0-based and within bounds
+  - Verify each tile has sufficient vertices for constraint references
+  - Use `python -c "import utils.load_data; utils.load_data.validate_files('vertices.txt', 'constraints.txt')"` to check
+
+#### Parsing Errors
+- **Error**: "could not convert string to float" or similar
+- **Solution**:
+  - Ensure all values in vertices files are numeric
+  - Check for extra spaces, tabs, or special characters
+  - Verify file encoding is UTF-8 or ASCII
+
+### Physics Stability Problems
+
+#### Constraint Violations
+- **Symptoms**: Connected tiles separate or behave unexpectedly
+- **Solutions**:
+  - Check constraint distances in target configuration using built-in validation
+  - Ensure constraint endpoints are close in target vertices (< 0.1 units apart)
+  - Verify constraint types (1 vs 2) match intended connection points
+
+#### Rigid Body Interpenetration
+- **Symptoms**: Tiles overlap or pass through each other
+- **Solutions**:
+  - Increase collision margins: modify `brick_thickness` parameter
+  - Reduce timestep for better collision detection
+  - Check initial configuration for pre-existing overlaps
+
+#### Energy Buildup
+- **Symptoms**: System gains energy over time, becomes increasingly unstable
+- **Solutions**:
+  - Increase damping parameters systematically
+  - Check for constraint conflicts (over-constrained systems)
+  - Verify target configuration is physically realistic
+
+### Target Deployment Issues
+
+#### Target Validation Failures
+- **Error**: "ERROR: Constraint X has large distance in target vertices"
+- **Solution**:
+  - Check target vertices file for constraint endpoint distances
+  - Modify target configuration to bring constraint points closer
+  - Consider using intermediate target configurations for complex deployments
+
+#### Incomplete Deployment
+- **Symptoms**: Deployment stops before reaching target configuration
+- **Solutions**:
+  - Increase `target_stiffness` gradually (monitor stability)
+  - Check for mechanical constraints preventing full deployment
+  - Verify target configuration is kinematically achievable
+  - Try reducing `target_damping` for more dynamic behavior
+
+#### Force Application Issues
+- **Symptoms**: Target forces seem ineffective or misdirected
+- **Solutions**:
+  - Verify vertex ordering consistency between initial and target files
+  - Check normal vector orientations are correct
+  - Ensure target vertices maintain same vertex count per tile
+
+### Performance and Memory Issues
+
+#### Slow Simulation
+- **Solutions**:
+  - Increase timestep (reduce precision for speed): `--timestep 1/120`
+  - Reduce substeps: `--substeps 10`
+  - Disable shadows: modify debug visualizer settings in code
+  - Reduce number of tiles in simulation
+
+#### Memory Usage
+- **Solutions**:
+  - Clear output files periodically (simulation saves can accumulate)
+  - Restart simulation for long-running experiments
+  - Monitor system resources during large simulations
+
+### Interactive Control Issues
+
+#### Mouse Selection Problems
+- **Symptoms**: Cannot select tiles with right-click
+- **Solutions**:
+  - Ensure camera is positioned appropriately
+  - Check that tiles are visible (not hidden behind others)
+  - Try different camera angles
+  - Verify PyBullet ray casting is working (restart simulation)
+
+#### Fixed Objects Not Responding
+- **Symptoms**: Fixed tiles (with red spheres) still move
+- **Solutions**:
+  - Check that constraint forces are sufficient (`max_force` parameter)
+  - Verify fixed constraints are properly created
+  - Restart simulation if constraint system becomes corrupted
+
+#### Keyboard Commands Not Working
+- **Solutions**:
+  - Ensure PyBullet window has focus
+  - Check for key repeat issues (press once, wait for response)
+  - Verify keyboard events are being captured in terminal output
 
 ---
 
@@ -366,28 +652,69 @@ n = (v1 - v0) × (v2 - v0) / ||(v1 - v0) × (v2 - v0)||
 
 ### Code Structure
 
-The simulator is organized into several key modules:
+The simulator is organized into a modular architecture with clear separation of concerns:
 
-- **`utils/physics_utils.py`**: New utility module providing reusable physics manipulation functions
-  - `fix_object_to_world()`: Fix objects to world frame using constraints
-  - `unfix_object_from_world()`: Remove fixed constraints to restore dynamics
-  - `fix_multiple_objects_to_world()`: Batch fixing for pause functionality
-  - `create_visual_indicator()`: Create visual markers for fixed objects
-  - These utilities are used by both interactive controls and pause functionality
-  
-- **`simulation/interactive_controls.py`**: Enhanced mouse-based interaction system
-  - Now uses `physics_utils` for cleaner, more reliable object fixing
-  - Improved error handling and visual feedback
-  
-- **`simulation/event_handler.py`**: Updated pause mechanism
-  - Replaced velocity-based pausing with constraint-based fixing
-  - More stable and predictable pause behavior
-  
-- **`utils/setup.py`**: Enhanced PyBullet configuration
-  - Disabled profiling to prevent `timings_*.json` file generation
-  - Optimized physics engine parameters for better performance
+#### Core Modules (`core/`)
+- **`simulation.py`**: Main simulation orchestration class
+  - `Simulation` class handles initialization and force application
+  - Integrates physics setup, geometry creation, and constraint management
+  - Provides clean interface for simulation lifecycle management
 
-The new physics utilities provide a clean separation of concerns and enable consistent object manipulation across different parts of the simulator.
+- **`event_handler.py`**: Event handling and simulation control
+  - `EventHandler` class coordinates user interactions and simulation events
+  - `SimulationController` handles high-level operations (reset, save, pause)
+  - Implements constraint-based pause mechanism for stable behavior
+  - Manages simulation state transitions and file I/O operations
+
+- **`interactive_controls.py`**: Mouse-based interaction system
+  - `InteractiveControls` class manages real-time tile manipulation
+  - Implements ray casting for precise tile selection
+  - Handles fix/unfix operations with visual feedback (red sphere indicators)
+  - Provides mouse event processing and camera-relative coordinate transformation
+
+#### Utility Modules (`utils/`)
+- **`physics_utils.py`**: Centralized physics manipulation utilities
+  - `fix_object_to_world()` / `unfix_object_from_world()`: Object constraint management
+  - `fix_multiple_objects_to_world()`: Batch operations for pause functionality
+  - `create_visual_indicator()` / `remove_visual_indicator()`: Visual feedback system
+  - `validate_constraints()`: Target configuration validation
+  - `setup_physics_engine()`: PyBullet initialization with optimized parameters
+
+- **`geometry.py`**: 3D geometry calculations and mesh generation
+  - `create_extruded_geometry()`: Converts 2D polygons to 3D extruded shapes
+  - `create_brick_body()`: PyBullet rigid body creation with collision shapes
+  - `create_constraints_between_bricks()`: Point-to-point constraint generation
+  - Normal vector computation and coordinate system management
+
+- **`setup.py`**: Configuration and argument parsing
+  - `parse_arguments()`: Command-line interface definition
+  - File path resolution and validation
+  - Parameter default value management
+
+- **`load_data.py`**: File I/O and data processing
+  - `load_vertices_from_file()` / `load_constraints_from_file()`: Input file parsing
+  - `create_visual_mesh()`: Mesh generation for rendering
+  - Data validation and error handling
+
+#### Main Entry Point
+- **`run_sim.py`**: Application entry point and simulation orchestration
+  - Coordinates initialization of all subsystems
+  - Manages main simulation loop with event processing
+  - Handles graceful shutdown and resource cleanup
+  - Provides example usage patterns and command-line interface
+
+#### Design Principles
+- **Modular Architecture**: Each module has a single, well-defined responsibility
+- **Centralized Utilities**: Common physics operations are unified in `physics_utils.py`
+- **Clean Interfaces**: Modules communicate through well-defined APIs
+- **Error Handling**: Comprehensive validation and graceful error recovery
+- **Performance Optimization**: Physics engine tuned for stability and speed
+
+#### Extension Points
+- **Custom Force Models**: Extend `target_based_forces.py` or `spring_forces.py`
+- **New Interaction Modes**: Add methods to `InteractiveControls` class
+- **File Format Support**: Extend data loading functions in `load_data.py`
+- **Visualization Features**: Modify rendering setup in `physics_utils.py`
 
 ---
 
