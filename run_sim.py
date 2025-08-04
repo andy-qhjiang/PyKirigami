@@ -1,5 +1,5 @@
 """
-Simplified Kirigami Simulation Script with Target-Based Deployment
+Kirigami Simulation Script with Target-Based Deployment
 
 This script provides a simplified interface for kirigami simulation with target-driven forces
 for controlled deployment of kirigami structures.
@@ -32,11 +32,11 @@ import pybullet as p
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Import from existing modules
-from utils.load_data import *
-from utils.setup import (parse_arguments, setup_physics_engine, create_ground_plane)
-from simulation.simulation import Simulation
-from simulation.event_handler import EventHandler
-from simulation.interactive_controls import InteractiveControls
+from utils.setup import *
+from utils.physics_utils import setup_physics_engine, create_ground_plane
+from core.simulation import Simulation
+from core.event_handler import EventHandler
+from core.interactive_controls import InteractiveControls
 
 
 def run_simulation(args):

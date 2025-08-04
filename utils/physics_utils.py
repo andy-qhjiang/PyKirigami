@@ -1,10 +1,71 @@
 """
-Physics utilities for object manipulation in PyBullet simulations.
-Provides common functions for fixing/unfixing objects to/from world frame.
+Physics utilities for object manipulation in PyBullet simulations, including:
+- Setting up the physics engine with gravity, timestep, and substeps 
+- stabilizing bodies with damping   
+- Creating visual indicators for fixed objects
+- Fixing and unfixing objects to/from the world frame
 """
 import sys
 import numpy as np
 import pybullet as p
+import pybullet_data
+
+def setup_physics_engine(gravity=(0, 0, -9.81), timestep=1/240, substeps=10, gui=True):
+    """
+    Set up the physics engine with basic parameters.
+    
+    Args:
+        gravity: Tuple of gravity components (default: (0, 0, -9.81))
+        timestep: Physics timestep (default: 1/240)
+        substeps: Number of sub-steps in the physics engine (default: 10)
+        gui: Whether to use GUI or direct mode (default: True)
+        
+    Returns:
+        int: The PyBullet client ID    """
+    if gui:
+        client_id = p.connect(p.GUI)
+    else:
+        client_id = p.connect(p.DIRECT)
+    
+    p.setAdditionalSearchPath(pybullet_data.getDataPath())
+    p.setGravity(*gravity)
+    p.setPhysicsEngineParameter(fixedTimeStep=timestep, numSubSteps=substeps)
+    
+    # Disable profiling to prevent generation of timings_*.json files
+    p.setPhysicsEngineParameter(
+        enableFileCaching=0, 
+        reportSolverAnalytics=0, 
+        deterministicOverlappingPairs=1,
+        enableConeFriction=0  # Additional performance improvement
+    )
+    
+    # # Explicitly disable timing file generation  
+    # p.configureDebugVisualizer(p.COV_ENABLE_TINY_RENDERER, 0)
+    # p.configureDebugVisualizer(p.COV_ENABLE_PROFILER, 0)
+    
+    return client_id
+
+def create_ground_plane():
+    """
+    Create a ground plane in the simulation.
+    
+    Returns:
+        int: The ground plane body ID
+    """
+    return p.loadURDF("plane.urdf")
+
+def stabilize_bodies(body_ids, linear_damping=1, angular_damping=1):
+    """
+    Apply damping to bodies to stabilize them.
+    
+    Args:
+        body_ids: List of body IDs to stabilize
+        linear_damping: Linear damping factor (default: 1)
+        angular_damping: Angular damping factor (default: 1)
+    """
+    for body_id in body_ids:
+        p.resetBaseVelocity(body_id, [0, 0, 0], [0, 0, 0])
+        p.changeDynamics(body_id, -1, linearDamping=linear_damping, angularDamping=angular_damping)
 
 
 def fix_object_to_world(object_id, max_force=1e10):

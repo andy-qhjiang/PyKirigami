@@ -6,12 +6,10 @@ allowing users to fix or unfix bricks by clicking on them.
 """
 import pybullet as p
 import numpy as np
-import math # Ensure math is imported if used for normalization, though it was commented out
+import math
 from utils.physics_utils import (
-    fix_object_to_world, 
-    unfix_object_from_world, 
-    create_visual_indicator, 
-    remove_visual_indicator
+    fix_object_to_world, unfix_object_from_world,
+    create_visual_indicator, remove_visual_indicator
 )
 
 
@@ -30,8 +28,7 @@ class InteractiveControls:
         
         # Dictionary to track fixed objects
         self.fixed_objects = {}  # {body_id: (original_mass, indicator_id)}
-        
-    
+
     def update_simulation_data(self, simulation_data):
         """
         Update the simulation data reference after resetting or reloading.
@@ -60,7 +57,7 @@ class InteractiveControls:
         if hit_position is None:
             hit_position = pos
         
-        # Use the utility function to create indicator
+        # Use the imported function to create indicator
         return create_visual_indicator(hit_position)
     
     def toggle_static(self, object_id, hit_position=None):

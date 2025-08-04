@@ -4,10 +4,9 @@ Handles initialization and force application for the simulation.
 """
 import numpy as np
 import pybullet as p
-from utils.load_data import load_vertices_from_file, load_constraints_from_file
-from utils.setup import stabilize_bodies
+from utils.setup import load_vertices_from_file, load_constraints_from_file
 from utils.geometry import create_extruded_geometry, create_brick_body, create_constraints_between_bricks
-from utils.physics_utils import validate_constraints
+from utils.physics_utils import stabilize_bodies, validate_constraints
 
 class Simulation:
     def __init__(self, args):
