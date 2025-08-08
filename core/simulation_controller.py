@@ -117,9 +117,7 @@ class SimulationController:
             p.stepSimulation()
             return
             
-        # Apply forces if deployment is enabled
-        args = self.simulation_data.get('args')
-        if args and args.target_vertices_file:
-            self.simulation_functions['apply_forces']()
+        # Apply forces (selection handled within Simulation.apply_forces)
+        self.simulation_functions['apply_forces']()
         
         p.stepSimulation()

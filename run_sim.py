@@ -13,8 +13,10 @@ Usage:
     # Basic simulation with physics only (no deployment forces)
     python run_sim.py --vertices_file fan_R10_r1_w3_h3_vertices.txt --constraints_file fan_R10_r1_w3_h3_constraints.txt  --ground_plane --gravity -200 --brick_thickness 0.1
 
-    python run_sim.py --vertices_file tangram_vertices.txt --constraints_file tangram_constraints.txt --ground_plane --gravity -100 --brick_thickness 0.1
 
+    # auto_expansion deployment:
+    python run_sim.py --vertices_file stampfli24_vertices_scaled.txt --constraints_file stampfli24_expansion_constraints.txt --ground_plane --gravity -100 --brick_thickness 0.1 --auto_expansion --camera_distance 12
+    
     # Target-based deployment examples:
     python run_sim.py --vertices_file cylinder_vertices.txt --constraints_file cylinder_constraints.txt --target_vertices_file cylinder_target.txt  --brick_thickness 0.1 --camera_distance 15
 

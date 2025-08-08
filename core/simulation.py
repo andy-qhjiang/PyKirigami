@@ -11,7 +11,7 @@ import numpy as np
 import pybullet as p
 from utils.config import load_vertices_from_file, load_constraints_from_file, validate_constraints
 from utils.geometry import create_extruded_geometry, create_brick_body, create_constraints_between_bricks, transform_local_to_world_coordinates
-from utils.physics_utils import stabilize_bodies
+from utils.physics_utils import stabilize_bodies, calculate_vertex_based_forces
 
 class Simulation:
     """
@@ -129,37 +129,36 @@ class Simulation:
     
     def apply_forces(self):
         """
-        Apply target-based forces to guide simulation toward target configuration.
-        Integrates all target-based force logic internally.
+        Choose and apply forces based on configuration:
+        - If target vertices are provided, apply target-driven vertex forces.
+        - Else if auto_expansion is enabled, apply center-of-mass expansion forces.
         """
-        current_bricks = self.simulation_data['bricks']
-        
-        # Check if we should use target-based deployment
-        if self.simulation_data.get('target_vertices'):
-            
-            # Transform local bottom vertices to world coordinates
-            bottom_world_coords = transform_local_to_world_coordinates(
-                current_bricks, self.simulation_data['local_coords']
-            )
-            
-            # Apply target-based forces to all bricks
-            self._apply_vertex_based_forces(
-                current_bricks, 
-                bottom_world_coords,
-                self.simulation_data['target_vertices']
-            )
+        args = self.simulation_data.get('args') # to check whether auto_expansion is enabled
+
+        # Target-driven deployment takes precedence when available
+        if self.simulation_data.get('target_vertices') and getattr(args, 'target_vertices_file', None):
+            self._apply_target_based_forces()
+            return
+
+        # Auto expansion as an alternative mode
+        if getattr(args, 'auto_expansion', False):
+            self._apply_expansion_forces()
     
-    def _apply_vertex_based_forces(self, body_ids, current_bottom_vertices, target_bottom_vertices):
+    def _apply_target_based_forces(self):
         """
-        Apply vertex-based target forces to all bodies in the simulation.
+        Apply target-based forces to all bodies in the simulation.
         Uses only bottom face vertices since top vertices are derived from bottom + thickness.
-        
-        Args:
-            body_ids: List of PyBullet body IDs
-            current_bottom_vertices: Current bottom vertex positions for each body  
-            target_bottom_vertices: Target bottom vertex positions for each body
         """
-        
+        body_ids = self.simulation_data.get('bricks', [])
+        target_bottom_vertices = self.simulation_data.get('target_vertices')
+        if not body_ids or not target_bottom_vertices:
+            return
+
+        # Transform local bottom vertices to world coordinates for current positions
+        current_bottom_vertices = transform_local_to_world_coordinates(
+            body_ids, self.simulation_data['local_coords']
+        )
+
         for i, body_id in enumerate(body_ids):
             if (i >= len(current_bottom_vertices) or i >= len(target_bottom_vertices)):
                 continue
@@ -169,11 +168,11 @@ class Simulation:
             linear_v, _ = p.getBaseVelocity(body_id)
             
             # Calculate vertex-based forces (bottom face only)
-            applied_force, total_torque = self._calculate_vertex_based_forces(
-                current_bottom_vertices[i], target_bottom_vertices[i]
+            applied_force, total_torque = calculate_vertex_based_forces(
+                current_bottom_vertices[i], target_bottom_vertices[i], self.args.spring_stiffness
             )
             
-            total_force = np.array(applied_force) - np.array(linear_v) * self.args.target_damping
+            total_force = np.array(applied_force) - np.array(linear_v) * self.args.force_damping
             
             # Apply forces to the body
             if np.linalg.norm(total_force) > 0:
@@ -191,40 +190,35 @@ class Simulation:
                     flags=p.WORLD_FRAME
                 )
     
-    def _calculate_vertex_based_forces(self, current_vertices, target_vertices):
+    
+
+    def _apply_expansion_forces(self):
         """
-        Calculate individual forces for each vertex, then compute the resultant force and torque.
-        
-        Args:
-            current_vertices: List of current vertex positions
-            target_vertices: List of target vertex positions  
-            
-        Returns:
-            tuple: (net_force, net_torque) for the face center
+        Apply center-of-mass based expansion forces to each brick:
+        F = k * (pos - whole_center) - c * vel
+        where k = spring_stiffness and c = force_damping.
         """
-        current_vertices = np.array(current_vertices)
-        target_vertices = np.array(target_vertices)
+        body_ids = self.simulation_data.get('bricks', [])
+        if not body_ids:
+            return
         
-        if len(current_vertices) != len(target_vertices):
-            return [0, 0, 0], [0, 0, 0]
-        
-        current_center = np.mean(current_vertices, axis=0)
-        
-        # Calculate force for each vertex
-        net_force = np.array([0.0, 0.0, 0.0])
-        net_torque = np.array([0.0, 0.0, 0.0])
-        
-        for i in range(len(current_vertices)):
-            # Force on this vertex toward its target
-            vertex_force = self.args.target_stiffness * (target_vertices[i] - current_vertices[i])
-            
-            # Add to net force
-            net_force += vertex_force
-            
-            # Calculate torque contribution: r × F
-            # r is vector from face center to vertex
-            r_vector = current_vertices[i] - current_center
-            torque_contribution = np.cross(r_vector, vertex_force)
-            net_torque += torque_contribution
-        
-        return net_force.tolist(), net_torque.tolist()
+        # Compute overall center of the structure (average of brick centers)
+        centers = []
+        for body_id in body_ids:
+            pos, _ = p.getBasePositionAndOrientation(body_id)
+            centers.append(np.array(pos))
+        whole_center = np.mean(centers, axis=0)
+
+        k = float(self.args.spring_stiffness)
+        c = float(self.args.force_damping)
+
+        for body_id in body_ids:
+            pos, _ = p.getBasePositionAndOrientation(body_id)
+            vel, _ = p.getBaseVelocity(body_id)
+            pos = np.array(pos)
+            vel = np.array(vel)
+            force = k * (pos - whole_center) - c * vel
+            if np.linalg.norm(force) > 0:
+                p.applyExternalForce(
+                    body_id, -1, force.tolist(), pos.tolist(), flags=p.WORLD_FRAME
+                )

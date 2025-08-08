@@ -189,4 +189,38 @@ def unfix_multiple_objects_from_world(constraints_dict):
     return success
 
 
+def calculate_vertex_based_forces(current_vertices, target_vertices, spring_stiffness):
+    """
+    Compute net force and torque from per-vertex springs toward target positions.
+
+    Args:
+        current_vertices: Iterable of current vertex positions [[x,y,z], ...]
+        target_vertices: Iterable of target vertex positions [[x,y,z], ...]
+        spring_stiffness: Scalar stiffness k for the spring model
+
+    Returns:
+        (net_force, net_torque): both as [fx, fy, fz] lists in world frame.
+    """
+    current_vertices = np.array(current_vertices)
+    target_vertices = np.array(target_vertices)
+
+    if len(current_vertices) != len(target_vertices) or len(current_vertices) == 0:
+        return [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]
+
+    current_center = np.mean(current_vertices, axis=0)
+
+    net_force = np.array([0.0, 0.0, 0.0])
+    net_torque = np.array([0.0, 0.0, 0.0])
+
+    for i in range(len(current_vertices)):
+        vertex_force = spring_stiffness * (target_vertices[i] - current_vertices[i])
+        net_force += vertex_force
+
+        r_vector = current_vertices[i] - current_center
+        torque_contribution = np.cross(r_vector, vertex_force)
+        net_torque += torque_contribution
+
+    return net_force.tolist(), net_torque.tolist()
+
+
 

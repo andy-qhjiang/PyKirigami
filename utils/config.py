@@ -102,11 +102,16 @@ def parse_arguments():
     parser.add_argument('--substeps', type=int, default=20, help='Physics substeps per step')
     
     
-    # Target-based deployment parameters
-    parser.add_argument('--target_stiffness', type=float, default=500.0,
-                       help='Stiffness coefficient for target-based forces')
-    parser.add_argument('--target_damping', type=float, default=50.0,
-                       help='Damping coefficient for target-based forces')
+    
+    # Versatile force model parameters (preferred)
+    parser.add_argument('--spring_stiffness', type=float, default=500,
+                       help='Generic spring stiffness used by force models (replaces --target_stiffness)')
+    parser.add_argument('--force_damping', type=float, default=50,
+                       help='Generic damping used by force models (replaces --target_damping)')
+
+    # Auto expansion mode (alternative to target-based)
+    parser.add_argument('--auto_expansion', action='store_true',
+                       help='Enable automatic expansion using center-of-mass based forces')
     
     
     
@@ -124,4 +129,17 @@ def parse_arguments():
     parser.add_argument('--camera_distance', type=float, default=8.0,
                        help='Distance of the camera from the origin')
     
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    # Backward-compatibility mapping for renamed parameters
+    if args.spring_stiffness is None:
+        args.spring_stiffness = args.target_stiffness
+    else:
+        args.target_stiffness = args.spring_stiffness
+
+    if args.force_damping is None:
+        args.force_damping = args.target_damping
+    else:
+        args.target_damping = args.force_damping
+
+    return args

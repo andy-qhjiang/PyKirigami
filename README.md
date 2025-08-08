@@ -15,12 +15,12 @@
    - 4.2 [Constraints File Format](#constraints-file-format)
    - 4.3 [Force Bricks File Format (Optional)](#force-bricks-file-format-optional)
 5. [Command-Line Arguments](#command-line-arguments)
-   - 5.1 [Required Arguments](#required-arguments)
-   - 5.2 [Physics Parameters](#physics-parameters)
-   - 5.3 [Expansion Parameters](#expansion-parameters)
-   - 5.4 [Geometry Parameters](#geometry-parameters)
-   - 5.5 [Damping Parameters](#damping-parameters)
-   - 5.6 [Visual Options](#visual-options)
+  - 5.1 [Required Arguments](#required-arguments)
+  - 5.2 [Physics Parameters](#physics-parameters)
+  - 5.3 [Force and Deployment Parameters](#force-and-deployment-parameters)
+  - 5.4 [Geometry Parameters](#geometry-parameters)
+  - 5.5 [Damping Parameters](#damping-parameters)
+  - 5.6 [Visual Options](#visual-options)
 6. [3D Tile Geometry and Normal Vector Orientation](#3d-tile-geometry-and-normal-vector-orientation)
    - 6.1 [Understanding Normal Vector Calculation](#understanding-normal-vector-calculation)
    - 6.2 [Vertex Ordering Guidelines](#vertex-ordering-guidelines)
@@ -150,7 +150,7 @@ python run_sim.py --vertices_file data/tangram_vertices.txt --constraints_file d
 3. Use mouse and keyboard controls to interact
 4. Save simulation state when desired
 
-**Note**: The default `target_stiffness` (500.0) and `target_damping` (50.0) parameters are carefully tuned for stable deployment. Advanced users can adjust these for specific behaviors.
+**Note**: The default `spring_stiffness` (500.0) and `force_damping` (50.0) parameters are carefully tuned for stable deployment. (Aliases `target_stiffness`/`target_damping` are supported.) Advanced users can adjust these for specific behaviors.
 
 ---
 
@@ -235,10 +235,11 @@ x1 y1 z1 x2 y2 z2 x3 y3 z3 ... xn yn zn
 - `--timestep`: Physics simulation timestep (default: 1/240)
 - `--substeps`: Number of physics substeps per frame (default: 20)
 
-### Target-Based Deployment Parameters
-- `--target_vertices_file`: Path to target vertices configuration file
-- `--target_stiffness`: Spring stiffness for target forces (default: 500.0)
-- `--target_damping`: Damping coefficient for target forces (default: 50.0)
+### Force and Deployment Parameters
+- `--target_vertices_file`: Path to target vertices configuration file (enables target-driven deployment)
+- `--auto_expansion`: Enable automatic center-of-mass expansion (alternative to target-based)
+- `--spring_stiffness`: Generic spring stiffness used by force models (alias of `--target_stiffness`)
+- `--force_damping`: Generic damping used by force models (alias of `--target_damping`)
 
 ### Geometry Parameters
 - `--brick_thickness`: Thickness of extruded 3D tiles (default: 0.02)
@@ -334,8 +335,8 @@ F_net = Σ F_i - μ_linear × v_linear
 ```
 
 Where:
-- `k`: Target stiffness parameter (`target_stiffness`, default: 500.0)
-- `μ_linear`: Linear damping coefficient (`target_damping`, default: 50.0)
+- `k`: Spring stiffness parameter (`spring_stiffness`, alias: `target_stiffness`, default: 500.0)
+- `μ_linear`: Linear damping coefficient (`force_damping`, alias: `target_damping`, default: 50.0)
 - `μ_angular`: Angular damping from system parameters
 - `r_i`: Vector from tile center to vertex `i`
 - `v_linear`, `v_angular`: Linear and angular velocities
@@ -354,6 +355,20 @@ Where `R` is the rotation matrix derived from the tile's current orientation qua
 4. **Damping Application**: Apply velocity-proportional damping
 5. **Physics Integration**: Apply forces and torques through PyBullet
 
+### Automatic Expansion Forces
+This mode expands the structure from its computed center using a simple, stable model:
+
+Per-tile force:
+```
+F = k * (pos - center) - c * v
+```
+Where `center` is the mean position of all tiles, `k = --spring_stiffness`, `c = --force_damping`.
+
+Example:
+```
+python run_sim.py --vertices_file data/tangram_vertices.txt --constraints_file data/tangram_constraints.txt --auto_expansion --spring_stiffness 80 --force_damping 10 --brick_thickness 0.05
+```
+
 ### Environmental Forces
 - **Gravity**: Configurable magnitude and direction (default: 0, disabled)
 - **System Damping**: Linear and angular velocity reduction (`linear_damping`, `angular_damping`)
@@ -365,7 +380,7 @@ Where `R` is the rotation matrix derived from the tile's current orientation qua
 - **Pause mechanism**: Constraint-based freezing of all objects
 
 ### Parameter Tuning Guidelines
-- **Start with defaults**: `target_stiffness=500.0`, `target_damping=50.0` are optimized for most cases
+- **Start with defaults**: `spring_stiffness=500.0`, `force_damping=50.0` are optimized for most cases
 - **Increase stiffness**: 750-1000 for faster deployment (monitor stability)
 - **Increase damping**: 75-150 if oscillations occur
 - **Adjust timestep**: Smaller values (1/480) for high-stiffness simulations
@@ -407,7 +422,7 @@ Where `R` is the rotation matrix derived from the tile's current orientation qua
 ```bash
 python run_sim.py --vertices_file data/partialSphere_vertices.txt --constraints_file data/partialSphere_constraints.txt --target_vertices_file data/partialSphere_target.txt --brick_thickness 0.02
 ```
-*Uses default optimized parameters: `target_stiffness=500.0`, `target_damping=50.0`*
+*Uses default optimized parameters: `spring_stiffness=500.0`, `force_damping=50.0` (aliases supported)*
 
 #### Cylinder Formation
 ```bash
@@ -420,7 +435,14 @@ python run_sim.py --vertices_file data/cylinder_w8_h2_vertices.txt --constraints
 
 #### Tangram Puzzle with Gravity
 ```bash
-python run_sim.py --vertices_file data/stampfli24_vertices.txt --constraints_file data/stampfli24_expansion_constraints.txt --gravity -100 --brick_thickness 0.1
+python run_sim.py \
+    --vertices_file data/tangram_vertices.txt \
+    --constraints_file data/tangram_constraints.txt \
+    --angular_damping 2.5 \
+    --linear_damping 2.5 \
+    --ground_plane \
+    --gravity -100 \
+    --brick_thickness 0.2
 ```
 *Higher damping prevents excessive bouncing under gravity*
 
@@ -443,8 +465,8 @@ python run_sim.py \
     --vertices_file data/partialSphere_vertices.txt \
     --constraints_file data/partialSphere_constraints.txt \
     --target_vertices_file data/partialSphere_target.txt \
-    --target_stiffness 1000.0 \
-    --target_damping 75.0 \
+  --spring_stiffness 1000.0 \
+  --force_damping 75.0 \
     --brick_thickness 0.02
 ```
 
@@ -454,8 +476,8 @@ python run_sim.py \
     --vertices_file data/partialSphere_vertices.txt \
     --constraints_file data/partialSphere_constraints.txt \
     --target_vertices_file data/partialSphere_target.txt \
-    --target_stiffness 200.0 \
-    --target_damping 25.0 \
+  --spring_stiffness 200.0 \
+  --force_damping 25.0 \
     --brick_thickness 0.02
 ```
 
@@ -467,13 +489,13 @@ python run_sim.py \
     --target_vertices_file data/cube2sphere_w4_h4_target.txt \
     --timestep 0.00208 \
     --substeps 30 \
-    --target_stiffness 750.0
+  --spring_stiffness 750.0
 ```
 **Note**: The value 0.00208 represents 1/480, which requires decimal input via command line (e.g., `--timestep 0.002083`). Be aware that smaller timesteps significantly increase computational cost while potentially providing diminishing returns in simulation accuracy.
 
 
 **Key Parameter Guidelines:**
-- **Default parameters** (`target_stiffness=500.0`, `target_damping=50.0`) work for most simulations
+- **Default parameters** (`spring_stiffness=500.0`, `force_damping=50.0`) work for most simulations
 - **Increase stiffness** (750-1000) for faster deployment, but monitor stability
 - **Increase damping** (75-150) if oscillations occur
 - **Adjust timestep** (1/480 to 1/120) based on stability vs. performance needs
@@ -492,15 +514,15 @@ python run_sim.py \
 #### Unstable Simulation
 - **Symptoms**: Objects jittering, exploding, or moving erratically
 - **Solutions**: 
-  - Reduce `target_stiffness` from default 500.0 to 100.0-300.0
-  - Increase `target_damping` from default 50.0 to 75.0-100.0
+  - Reduce `spring_stiffness` from default 500.0 to 100.0-300.0
+  - Increase `force_damping` from default 50.0 to 75.0-100.0
   - Decrease physics `timestep` to 1/480 or smaller
   - Increase `substeps` to 30-50 for better numerical stability
 
 #### Slow or No Deployment
 - **Symptoms**: Target-based deployment progresses very slowly or stalls
 - **Solutions**:
-  - Increase `target_stiffness` gradually (try 750.0-1000.0)
+  - Increase `spring_stiffness` gradually (try 750.0-1000.0)
   - Ensure target vertices file is correctly formatted
   - Check that target configuration is physically achievable
   - Verify constraint connections allow required movement
@@ -515,9 +537,9 @@ python run_sim.py \
 #### Excessive Oscillation
 - **Symptoms**: Objects vibrate or oscillate around target positions
 - **Solutions**:
-  - Increase `target_damping` to 75.0-150.0
+  - Increase `force_damping` to 75.0-150.0
   - Increase system damping: `--linear_damping 2.5 --angular_damping 2.5`
-  - Reduce `target_stiffness` for gentler convergence
+  - Reduce `spring_stiffness` for gentler convergence
   - Check timestep is appropriate for force magnitudes
 
 ### File Format Errors
@@ -569,10 +591,10 @@ python run_sim.py \
 #### Incomplete Deployment
 - **Symptoms**: Deployment stops before reaching target configuration
 - **Solutions**:
-  - Increase `target_stiffness` gradually (monitor stability)
+  - Increase `spring_stiffness` gradually (monitor stability)
   - Check for mechanical constraints preventing full deployment
   - Verify target configuration is kinematically achievable
-  - Try reducing `target_damping` for more dynamic behavior
+  - Try reducing `force_damping` for more dynamic behavior
 
 #### Force Application Issues
 - **Symptoms**: Target forces seem ineffective or misdirected
@@ -679,7 +701,7 @@ The simulation maintains a central data dictionary that coordinates state across
 | **Component** | **Type** | **Description** |
 |---------------|----------|-----------------|
 | `args` | Configuration object | User-defined simulation parameters including gravity, damping coefficients, and brick thickness |
-| `brick_ids` | List of integers | PyBullet body IDs for all kirigami tiles, used for applying forces and querying state |
+| `bricks` | List of integers | PyBullet body IDs for all kirigami tiles, used for applying forces and querying state |
 | `local_coords` | Nested coordinate arrays | Local vertex coordinates organized per tile, enabling efficient world-space transformations |
 | `constraint_ids` | List of integers | PyBullet constraint IDs representing connections between tiles |
 | `target_vertices` | Nested coordinate arrays | Target positions for all vertices during deployment (optional) |
