@@ -1,8 +1,11 @@
 """
-Interactive Controls for Kirigami Simulation
+Interaction Controller for Kirigami Simulation
 
-This module provides mouse-based interaction functionality for the Kirigami simulation,
-allowing users to fix or unfix bricks by clicking on them.
+This module provides mouse-based interaction functionality for the Kirigami simulation, including:
+- Processing mouse events (right-click to fix/unfix bricks)
+- Managing fixed object constraints and visual indicators
+- Converting screen coordinates to 3D world ray casting
+- Providing real-time user interaction with simulation objects
 """
 import pybullet as p
 import numpy as np
@@ -14,8 +17,11 @@ from utils.physics_utils import (
 
 
 
-class InteractiveControls:
-    """Manages interactive mouse-based controls for the simulation."""
+class InteractionController:
+    """
+    Handles mouse-based interactive controls for the simulation.
+   
+    """
     
     def __init__(self, simulation_data):
         """
@@ -29,16 +35,6 @@ class InteractiveControls:
         # Dictionary to track fixed objects
         self.fixed_objects = {}  # {body_id: (constraint_id, indicator_id)}
 
-    def update_simulation_data(self, simulation_data):
-        """
-        Update the simulation data reference after resetting or reloading.
-        
-        Args:
-            simulation_data: Updated simulation data dictionary
-        """
-        self.simulation_data = simulation_data
-
-    
     def create_static_indicator(self, object_id, hit_position=None):
         """
         Create a visual indicator for fixed/static objects.

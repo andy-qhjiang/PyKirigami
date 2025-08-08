@@ -136,23 +136,12 @@ conda install -c conda-forge numpy pybullet
 
 ### Target-Based Deployment (Recommended)
 ```bash
-python run_sim.py \
-    --vertices_file data/partialSphere_vertices.txt \
-    --constraints_file data/partialSphere_constraints.txt \
-    --target_vertices_file data/partialSphere_target.txt \
-    --brick_thickness 0.02
+python run_sim.py --vertices_file data/partialSphere_vertices.txt --constraints_file data/partialSphere_constraints.txt --target_vertices_file data/partialSphere_target.txt --brick_thickness 0.02
 ```
 
 ### Basic Physics Simulation
 ```bash
-python run_sim.py \
-    --vertices_file data/tangram_vertices.txt \
-    --constraints_file data/tangram_constraints.txt \
-    --angular_damping 2.5 \
-    --linear_damping 2.5 \
-    --ground_plane \
-    --gravity -100 \
-    --brick_thickness 0.2
+python run_sim.py --vertices_file data/tangram_vertices.txt --constraints_file data/tangram_constraints.txt --ground_plane --gravity -100 --brick_thickness 0.2
 ```
 
 ### Running Your First Simulation
@@ -175,6 +164,8 @@ python run_sim.py \
 x1 y1 z1 x2 y2 z2 x3 y3 z3 ... xn yn zn
 ```
 
+![Illustration about how vertex file is organized](gallery/vertices_demo.png "An illustration of the vertex coordinates encoded in the input file via file parsing")
+
 **Example** (Triangle):
 ```
 0.0 0.0 0.0 1.0 0.0 0.0 0.5 1.0 0.0
@@ -192,6 +183,8 @@ x1 y1 z1 x2 y2 z2 x3 y3 z3 ... xn yn zn
 
 ### Constraints File Format
 **Purpose**: Defines point-to-point connections between kirigami tiles
+
+![Illustration for how constraint file represents connection](gallery/constraint_demo.png "")
 
 **Format**: Each line specifies a connection between two tiles
 ```
@@ -272,6 +265,8 @@ n = (v1 - v0) × (v2 - v0) / ||(v1 - v0) × (v2 - v0)||
 - **Consistent ordering**: Use either all clockwise or all counter-clockwise
 - **Right-hand rule**: Determines which direction is "up" (positive normal)
 - **Visual verification**: Check that all tiles extrude in expected directions
+
+![illustration for extrusion](gallery/extrusion_demo.png "")
 
 ### Top vs Bottom Face Assignment
 - **Bottom face**: Original vertices from input file
@@ -410,22 +405,13 @@ Where `R` is the rotation matrix derived from the tile's current orientation qua
 
 #### Partial Sphere Deployment
 ```bash
-python run_sim.py \
-    --vertices_file data/partialSphere_vertices.txt \
-    --constraints_file data/partialSphere_constraints.txt \
-    --target_vertices_file data/partialSphere_target.txt \
-    --brick_thickness 0.02
+python run_sim.py --vertices_file data/partialSphere_vertices.txt --constraints_file data/partialSphere_constraints.txt --target_vertices_file data/partialSphere_target.txt --brick_thickness 0.02
 ```
 *Uses default optimized parameters: `target_stiffness=500.0`, `target_damping=50.0`*
 
 #### Cylinder Formation
 ```bash
-python run_sim.py \
-    --vertices_file data/cylinder_w8_h2_vertices.txt \
-    --constraints_file data/cylinder_w8_h2_constraints.txt \
-    --target_vertices_file data/cylinder_target.txt \
-    --brick_thickness 0.1 \
-    --camera_distance 15
+python run_sim.py --vertices_file data/cylinder_w8_h2_vertices.txt --constraints_file data/cylinder_w8_h2_constraints.txt --target_vertices_file data/cylinder_target.txt --brick_thickness 0.1 --camera_distance 15
 ```
 *Default parameters work well for most cylinder deployments*
 
@@ -434,14 +420,7 @@ python run_sim.py \
 
 #### Tangram Puzzle with Gravity
 ```bash
-python run_sim.py \
-    --vertices_file data/tangram_vertices.txt \
-    --constraints_file data/tangram_constraints.txt \
-    --angular_damping 2.5 \
-    --linear_damping 2.5 \
-    --ground_plane \
-    --gravity -100 \
-    --brick_thickness 0.2
+python run_sim.py --vertices_file data/stampfli24_vertices.txt --constraints_file data/stampfli24_expansion_constraints.txt --gravity -100 --brick_thickness 0.1
 ```
 *Higher damping prevents excessive bouncing under gravity*
 
@@ -646,25 +625,32 @@ python run_sim.py \
 
 ### Code Structure
 
-The simulator is organized into a modular architecture with clear separation of concerns:
+
+
+The simulator follows a clear three-controller architecture with distinct responsibilities:
+
+![flowchart](gallery/flowchart.png)
+
 
 #### Core Modules (`core/`)
-- **`simulation.py`**: Main simulation orchestration class
-  - `Simulation` class handles initialization and force application
-  - Integrates physics setup, geometry creation, and constraint management
-  - Provides clean interface for simulation lifecycle management
+- **`simulation.py`**: Simulation initialization and setup
+  - `Simulation` class handles **initialization only**: loading data, creating bodies, setting up constraints
+  - Integrates physics setup, geometry creation, and constraint management during initialization
+  - Provides clean interface for simulation setup and data preparation
+  
 
-- **`event_handler.py`**: Event handling and simulation control
-  - `EventHandler` class coordinates user interactions and simulation events
-  - `SimulationController` handles high-level operations (reset, save, pause)
-  - Implements constraint-based pause mechanism for stable behavior
-  - Manages simulation state transitions and file I/O operations
+- **`simulation_controller.py`**: Runtime control and force application  
+  - `SimulationController` handles **keyboard events and force application**
+  - Processes keyboard events (R-reset, S-save, P-pause, Q-quit)
+  - Applies target-based forces during simulation runtime
+  - Manages simulation state transitions (pause/resume, reset)
+  - Coordinates physics stepping with PyBullet engine
 
-- **`interactive_controls.py`**: Mouse-based interaction system
-  - `InteractiveControls` class manages real-time tile manipulation
-  - Implements ray casting for precise tile selection
+- **`interaction_controller.py`**: Mouse-based interaction system
+  - `InteractionController` manages **mouse events only**
+  - Implements ray casting for precise tile selection via right-click
   - Handles fix/unfix operations with visual feedback (red sphere indicators)
-  - Provides mouse event processing and camera-relative coordinate transformation
+  - Processes mouse events and camera-relative coordinate transformation
 
 #### Utility Modules (`utils/`)
 - **`physics_utils.py`**: Centralized physics manipulation utilities
@@ -677,34 +663,62 @@ The simulator is organized into a modular architecture with clear separation of 
   - `create_extruded_geometry()`: Converts 2D polygons to 3D extruded shapes
   - `create_brick_body()`: PyBullet rigid body creation with collision shapes
   - `create_constraints_between_bricks()`: Point-to-point constraint generation
+  - `transform_local_to_world_coordinates()`: Coordinate system transformations
   - Normal vector computation and coordinate system management
 
-- **`setup.py`**: Configuration and argument parsing
+- **`config.py`**: Configuration and argument parsing (renamed from `setup.py`)
   - `load_vertices_from_file()` / `load_constraints_from_file()`: Input file parsing
-  - `validate_constraints()`: constraint validation to ensure compatibility
+  - `validate_constraints()`: Constraint validation to ensure compatibility
   - `parse_arguments()`: Command-line interface definition
   - Parameter default value management
+
+#### Central Simulation Data Structure
+
+The simulation maintains a central data dictionary that coordinates state across all modules:
+
+| **Component** | **Type** | **Description** |
+|---------------|----------|-----------------|
+| `args` | Configuration object | User-defined simulation parameters including gravity, damping coefficients, and brick thickness |
+| `brick_ids` | List of integers | PyBullet body IDs for all kirigami tiles, used for applying forces and querying state |
+| `local_coords` | Nested coordinate arrays | Local vertex coordinates organized per tile, enabling efficient world-space transformations |
+| `constraint_ids` | List of integers | PyBullet constraint IDs representing connections between tiles |
+| `target_vertices` | Nested coordinate arrays | Target positions for all vertices during deployment (optional) |
+
+**Data Flow**:
+1. **Initialization**: `Simulation` class creates and populates this structure
+2. **Runtime**: `SimulationController` and `InteractionController` read from this structure
+3. **Reset**: `SimulationController` recreates the structure using stored `args`
+4. **Updates**: Only the `SimulationController` modifies the structure during reset operations
 
 
 #### Main Entry Point
 - **`run_sim.py`**: Application entry point and simulation orchestration
-  - Coordinates initialization of all subsystems
-  - Manages main simulation loop with event processing
+  - Coordinates initialization of all three controller subsystems
+  - Creates and manages the central simulation data structure  
+  - Implements the main simulation loop with keyboard/mouse event processing
   - Handles graceful shutdown and resource cleanup
-  - Provides example usage patterns and command-line interface
+  - Provides comprehensive command-line interface and usage examples
+  - **Architecture Integration**: 
+    - Instantiates `Simulation` for initialization
+    - Creates `SimulationController` with simulation data for runtime control
+    - Sets up `InteractionController` for mouse-based user interaction
 
 #### Design Principles
-- **Modular Architecture**: Each module has a single, well-defined responsibility
-- **Centralized Utilities**: Common physics operations are unified in `physics_utils.py`
-- **Clean Interfaces**: Modules communicate through well-defined APIs
+- **Modular Architecture**: Clear separation of concerns across three main controllers
+  - **Initialization**: `Simulation` class handles setup and data preparation
+  - **Runtime Control**: `SimulationController` manages physics stepping and force application  
+  - **User Interaction**: `InteractionController` processes mouse events
+- **Centralized Data**: Unified simulation data structure coordinates state across modules
+- **Clean Interfaces**: Modules communicate through well-defined APIs and shared data structure
 - **Error Handling**: Comprehensive validation and graceful error recovery
 - **Performance Optimization**: Physics engine tuned for stability and speed
 
 #### Extension Points
-- **Custom Force Models**: Extend `target_based_forces.py` or `spring_forces.py`
-- **New Interaction Modes**: Add methods to `InteractiveControls` class
-- **File Format Support**: Extend data loading functions in `load_data.py`
+- **Custom Force Models**: Extend force application methods in `SimulationController`
+- **New Interaction Modes**: Add methods to `InteractionController` class
+- **File Format Support**: Extend data loading functions in `config.py`
 - **Visualization Features**: Modify rendering setup in `physics_utils.py`
+- **Simulation Analytics**: Access central data structure for real-time analysis
 
 ---
 

@@ -1,5 +1,5 @@
 """
-Setup utilities for argument parsing and file loading.
+Handles command-line arguments, file loading, and data validation.
 """
 import argparse
 import numpy as np

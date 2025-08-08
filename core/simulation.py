@@ -1,14 +1,33 @@
 """
-Core simulation class for kirigami deployment.
-Handles initialization and force application for the simulation.
+Simulation Initialization Module for Kirigami Deployment
+
+This module handles the initialization of the kirigami simulation, including:
+- Loading vertex and constraint data from files
+- Creating PyBullet rigid bodies (bricks) and constraints
+- Setting up the initial simulation state
+- Preparing data structures for runtime simulation control
 """
 import numpy as np
 import pybullet as p
-from utils.setup import load_vertices_from_file, load_constraints_from_file, validate_constraints
-from utils.geometry import create_extruded_geometry, create_brick_body, create_constraints_between_bricks
+from utils.config import load_vertices_from_file, load_constraints_from_file, validate_constraints
+from utils.geometry import create_extruded_geometry, create_brick_body, create_constraints_between_bricks, transform_local_to_world_coordinates
 from utils.physics_utils import stabilize_bodies
 
 class Simulation:
+    """
+    Handles initialization and setup of the kirigami simulation.
+    
+    This class is responsible for:
+    - Loading vertex and constraint data from input files
+    - Creating PyBullet physics bodies and constraints
+    - Setting up the initial simulation state
+    - Preparing data structures for runtime control
+    
+    The class does NOT handle:
+    - Runtime simulation stepping (handled by SimulationController)
+    - User interactions (handled by InteractionController)
+    - Force application during simulation (handled by SimulationController)
+    """
     def __init__(self, args):
         self.args = args
         self.simulation_data = {}
@@ -20,8 +39,8 @@ class Simulation:
         Returns:
             dict: Simulation data dictionary with all required objects
         """
-        # Create new local lists for bricks
-        local_bricks = []
+        # Create new list for brick IDs
+        brick_ids = []
         
         # Load data
         vertices = load_vertices_from_file(self.args.vertices_file)
@@ -57,7 +76,7 @@ class Simulation:
             # Create brick body in physics engine
             brick_id = create_brick_body(local_verts, visual_indices, center)
             
-            local_bricks.append(brick_id)
+            brick_ids.append(brick_id)
             local_verts_list.append(local_verts)
             
             # Process target vertices if available (convert to same format as current_bottom)
@@ -81,21 +100,28 @@ class Simulation:
             target_bottom_vertices = None
             
         # Stabilize bricks
-        stabilize_bodies(local_bricks, 
+        stabilize_bodies(brick_ids, 
                         linear_damping=self.args.linear_damping, 
                         angular_damping=self.args.angular_damping)
         
         # Create constraints between bricks
         constraint_ids = create_constraints_between_bricks(
-            local_bricks, constraints, local_verts_list
+            brick_ids, constraints, local_verts_list
         )
         
+        local_bottom_vertices = []
+        for local_verts in local_verts_list:
+            num_bottom = len(local_verts) // 2  # Compute number of bottom vertices
+            # Bottom vertices are the first num_bottom vertices in local_verts
+            local_bottom = local_verts[:num_bottom]
+            local_bottom_vertices.append(local_bottom)
+
         # Prepare simulation data
         self.simulation_data = {
             'args': self.args,
             'target_vertices': target_bottom_vertices,
-            'bricks': local_bricks,
-            'local_verts_list': local_verts_list,
+            'bricks': brick_ids,
+            'local_coords': local_bottom_vertices,  # Optimized for coordinate transforms
             'constraint_ids': constraint_ids,
         }
         
@@ -111,61 +137,17 @@ class Simulation:
         # Check if we should use target-based deployment
         if self.simulation_data.get('target_vertices'):
             
-            # Compute local bottom vertices on-demand from stored local_verts
-            local_verts_list = self.simulation_data['local_verts_list']
-            
-            # Create local bottom vertices for each brick
-            local_bottom_vertices = []
-            for local_verts in local_verts_list:
-                num_bottom = len(local_verts) // 2  # Compute number of bottom vertices
-                # Bottom vertices are the first num_bottom vertices in local_verts
-                local_bottom = local_verts[:num_bottom]
-                local_bottom_vertices.append(local_bottom)
-            
-            # Update current vertex positions from simulation
-            current_bottom = self._update_current_vertices_from_simulation(
-                current_bricks, local_bottom_vertices
+            # Transform local bottom vertices to world coordinates
+            bottom_world_coords = transform_local_to_world_coordinates(
+                current_bricks, self.simulation_data['local_coords']
             )
             
             # Apply target-based forces to all bricks
             self._apply_vertex_based_forces(
                 current_bricks, 
-                current_bottom,
+                bottom_world_coords,
                 self.simulation_data['target_vertices']
             )
-    
-    def _update_current_vertices_from_simulation(self, body_ids, local_bottom_vertices):
-        """
-        Update the current bottom vertex positions based on the current state of the simulation.
-        This function transforms local vertex coordinates to world coordinates.
-        
-        Args:
-            body_ids: List of PyBullet body IDs
-            local_bottom_vertices: Local bottom vertex coordinates for each body
-            
-        Returns:
-            list: updated_bottom_vertices in world coordinates  
-        """
-        updated_bottom = []
-        
-        for i, body_id in enumerate(body_ids):
-            if i >= len(local_bottom_vertices):
-                continue
-                
-            # Get current pose of this brick
-            current_pos, current_orn = p.getBasePositionAndOrientation(body_id)
-            
-            # Convert quaternion to rotation matrix
-            rotation_matrix = np.array(p.getMatrixFromQuaternion(current_orn)).reshape(3, 3)
-            
-            # Vectorized transformation of all vertices for this brick
-            local_verts = np.array(local_bottom_vertices[i])  # Shape: (n_vertices, 3)
-            world_verts = (rotation_matrix @ local_verts.T).T + np.array(current_pos)  # Shape: (n_vertices, 3)
-            
-            # Add this brick's transformed vertices to the result
-            updated_bottom.append(world_verts.tolist())
-        
-        return updated_bottom
     
     def _apply_vertex_based_forces(self, body_ids, current_bottom_vertices, target_bottom_vertices):
         """
@@ -184,7 +166,7 @@ class Simulation:
                 
             # Get current state
             center_pos, _ = p.getBasePositionAndOrientation(body_id)
-            linear_v, angular_v = p.getBaseVelocity(body_id)
+            linear_v, _ = p.getBaseVelocity(body_id)
             
             # Calculate vertex-based forces (bottom face only)
             applied_force, total_torque = self._calculate_vertex_based_forces(

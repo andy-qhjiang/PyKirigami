@@ -4,6 +4,7 @@ Geometry utilities for the kirigami simulation project.
 import numpy as np
 import pybullet as p
 
+
 def create_extruded_geometry(vertices_flat, brick_thickness):
     """
     Create 3D extruded geometry from 2D polygon vertices.
@@ -18,6 +19,7 @@ def create_extruded_geometry(vertices_flat, brick_thickness):
         
     Returns:
         tuple: (local_verts, visual_indices, center)
+        local_verts: List of vertices relative to the center
     """
     # Convert to numpy array and reshape vertices
     vertices_array = np.array(vertices_flat)
@@ -170,3 +172,42 @@ def create_constraints_between_bricks(bricks, constraints_with_types, local_vert
         created_constraints.append(c_id)
             
     return created_constraints
+
+
+def transform_local_to_world_coordinates(body_ids, local_vertices):
+    """
+    Transform local vertex coordinates to world coordinates based on current body poses.
+    
+    This function takes local vertex coordinates (relative to body centers) and transforms
+    them to world coordinates using the current position and orientation of each body
+    from the physics simulation.
+    
+    Args:
+        body_ids: List of PyBullet body IDs
+        local_vertices: List of local vertex coordinate arrays for each body
+                       [[[x1,y1,z1], [x2,y2,z2], ...], ...]
+
+    Returns:
+        list: List of transformed vertices in world coordinates for each body
+              Each element contains the world coordinates of all vertices for that body
+    """
+    transformed_vertices = []
+    
+    for i, body_id in enumerate(body_ids):
+        if i >= len(local_vertices):
+            continue
+            
+        # Get current pose of this brick
+        current_pos, current_orn = p.getBasePositionAndOrientation(body_id)
+        
+        # Convert quaternion to rotation matrix
+        rotation_matrix = np.array(p.getMatrixFromQuaternion(current_orn)).reshape(3, 3)
+        
+        # Vectorized transformation of all vertices for this brick
+        local_verts = np.array(local_vertices[i])  # Shape: (n_vertices, 3)
+        world_verts = (rotation_matrix @ local_verts.T).T + np.array(current_pos)  # Shape: (n_vertices, 3)
+        
+        # Add this brick's transformed vertices to the result
+        transformed_vertices.append(world_verts.tolist())
+    
+    return transformed_vertices

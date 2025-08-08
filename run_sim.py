@@ -32,11 +32,11 @@ import pybullet as p
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Import from existing modules
-from utils.setup import *
+from utils.config import *
 from utils.physics_utils import setup_physics_engine, create_ground_plane
 from core.simulation import Simulation
-from core.event_handler import EventHandler
-from core.interactive_controls import InteractiveControls
+from core.simulation_controller import SimulationController
+from core.interaction_controller import InteractionController
 
 
 def run_simulation(args):
@@ -63,7 +63,7 @@ def run_simulation(args):
     
     if args.ground_plane:
         create_ground_plane()
-    
+
     # Create simulation instance
     simulation = Simulation(args)
     
@@ -77,17 +77,18 @@ def run_simulation(args):
     # Initialize simulation for the first time
     sim_data = initialize_simulation()
     
+    
     # Create simulation functions dict
     simulation_functions = {
         'initialize_simulation': initialize_simulation,
         'apply_forces': apply_forces
     }
     
-    # Create event handler
-    event_handler = EventHandler(sim_data, simulation_functions)
-    
-    # Create interactive controls
-    interactive_controls = InteractiveControls(sim_data)
+    # Create simulation controller (replaces event handler)
+    simulation_controller = SimulationController(sim_data, simulation_functions)
+
+    # Create interaction controller
+    interaction_controller = InteractionController(sim_data)
     
     # Set up interactive simulation with keyboard controls
     print("Starting interactive simulation...")
@@ -108,31 +109,29 @@ def run_simulation(args):
             # Process keyboard inputs
             if ord('r') in keys and keys[ord('r')] & p.KEY_WAS_TRIGGERED:
                 print("Resetting simulation...")
-                # Reset the state of interactive controls (e.g., clear fixed objects)
-                interactive_controls.reset()
-                # Reset simulation via event handler (which calls controller)
-                sim_data = event_handler.reset_simulation()                
-                # Update interactive controls with the new simulation data
-                interactive_controls.update_simulation_data(sim_data)
+                # Reset the state of interaction controller (clear fixed objects)
+                interaction_controller.reset()
+                # Reset simulation via simulation controller
+                simulation_controller.reset_simulation()                
                 
-                print("Simulation reset and interactive controls updated.")
+                print("Simulation reset completed.")
 
             if ord('s') in keys and keys[ord('s')] & p.KEY_WAS_TRIGGERED:
-                event_handler.save_vertex_locations()
+                simulation_controller.save_vertex_locations()
 
             if ord('p') in keys and keys[ord('p')] & p.KEY_WAS_TRIGGERED:
-                event_handler.toggle_pause()
+                simulation_controller.toggle_pause()
 
             if ord('q') in keys and keys[ord('q')] & p.KEY_WAS_TRIGGERED:
                 print("Quitting simulation...")
                 break
             
-            # Process mouse events for interactive controls (e.g., toggling fixed state)
-            interactive_controls.process_mouse_events() 
+            # Process mouse events for interaction controller (e.g., toggling fixed state)
+            interaction_controller.process_mouse_events() 
             
             # Step simulation (applies forces, calls p.stepSimulation())
-            event_handler.step_simulation() 
-            
+            simulation_controller.step_simulation()
+
             time.sleep(args.timestep)
             
     except KeyboardInterrupt:
