@@ -10,10 +10,21 @@ This module provides mouse-based interaction functionality for the Kirigami simu
 import pybullet as p
 import numpy as np
 import math
+import os
+from datetime import datetime
+
+# Optional Pillow import for snapshot PNG saving (handled gracefully if absent)
+try:
+    from PIL import Image  # noqa: F401
+except ImportError:  # Pillow not installed; snapshot will fall back to .npy
+    Image = None
 from utils.physics_utils import (
     fix_object_to_world, unfix_object_from_world,
-    create_visual_indicator, remove_visual_indicator
 )
+
+# Fixed highlight color (simplified – project chooses a single highlight scheme)
+FIXED_HIGHLIGHT_COLOR = [0.95, 0.55, 0.15, 1.0]  # warm orange
+SKY_BLUE_COLOR = [0.53, 0.81, 0.98, 1.0]  # sky blue (base color for free bricks)
 
 
 
@@ -24,74 +35,32 @@ class InteractionController:
     """
     
     def __init__(self, simulation_data):
-        """
-        Initialize the interactive controls.
-        
+        """Initialize the interactive controls.
+
         Args:
             simulation_data: Dictionary containing simulation data
         """
         self.simulation_data = simulation_data
-        
-        # Dictionary to track fixed objects
-        self.fixed_objects = {}  # {body_id: (constraint_id, indicator_id)}
-
-    def create_static_indicator(self, object_id, hit_position=None):
-        """
-        Create a visual indicator for fixed/static objects.
-        
-        Args:
-            object_id: ID of the object being fixed
-            hit_position: Position where the object was hit (or None for center)
-            
-        Returns:
-            int: ID of the created indicator
-        """
-        # Get object position
-        pos, _ = p.getBasePositionAndOrientation(object_id)
-        
-        # If no hit position provided, use object center
-        if hit_position is None:
-            hit_position = pos
-        
-        # Use the imported function to create indicator
-        return create_visual_indicator(hit_position)
+        # Track fixed objects
+        self.fixed_objects = {}        # {body_id: constraint_id}
     
-    def toggle_static(self, object_id, hit_position=None):
+    
+    def toggle_static(self, object_id):
+        """Toggle an object between free and fixed states.
+
+        Free brick  -> apply FIXED_HIGHLIGHT_COLOR and add fixed constraint.
+        Fixed brick -> revert to SKY_BLUE_COLOR and remove constraint.
         """
-        Toggle an object between static and dynamic states using a JOINT_FIXED constraint.
-        
-        Args:
-            object_id: ID of the object to toggle
-            hit_position: Position where the object was hit (or None)
-            
-        Returns:
-            bool: True if object is now static, False if dynamic
-        """
-        if object_id in self.fixed_objects:
-            # Object is static - make it dynamic again
-            unfix_object_from_world(self.fixed_objects[object_id]['constraint_id'])
-            remove_visual_indicator(self.fixed_objects[object_id]['indicator_id'])
-                
-            # Remove from fixed objects dictionary
+        if object_id in self.fixed_objects:  # currently fixed -> free it
+            unfix_object_from_world(self.fixed_objects[object_id])
             del self.fixed_objects[object_id]
+            p.changeVisualShape(object_id, -1, rgbaColor=SKY_BLUE_COLOR)
             print(f"Brick {object_id} is free.")
-   
-        else: # Object is dynamic - make it static
-            # Use utility function to fix object to world
+        else:  # currently free -> fix it
             constraint_id = fix_object_to_world(object_id)
-            
-            # Create visual indicator
-            indicator_id = self.create_static_indicator(object_id, hit_position)
-            
-            # Store in dictionary
-            self.fixed_objects[object_id] = {
-                'constraint_id': constraint_id,
-                'indicator_id': indicator_id
-            }
-            
+            self.fixed_objects[object_id] = constraint_id
+            p.changeVisualShape(object_id, -1, rgbaColor=FIXED_HIGHLIGHT_COLOR)
             print(f"Brick {object_id} is fixed.")
-            
-        return object_id in self.fixed_objects
             
     def process_mouse_events(self):
         """
@@ -170,12 +139,11 @@ class InteractionController:
                 
                 if results and results[0][0] >= 0:  # If we hit something
                     hit_object_id = results[0][0]
-                    hit_position = results[0][3]
                   
                     # Check if the hit object is a brick
                     if hit_object_id in self.simulation_data['bricks']:
                         # Toggle static state
-                        self.toggle_static(hit_object_id, hit_position)
+                        self.toggle_static(hit_object_id)
                         return True
                     else:
                         print(f"Object {hit_object_id} is not a brick in our simulation")
@@ -185,16 +153,71 @@ class InteractionController:
         return False
     
     def reset(self):
-        """
-        Reset all fixed objects to dynamic state and remove indicators.
-        """
+        """Release all fixed bricks and restore base color."""
         fixed_ids = list(self.fixed_objects.keys())
-        
         for object_id in fixed_ids:
-            # Remove constraint and indicator using utility functions
-            unfix_object_from_world(self.fixed_objects[object_id]['constraint_id'])
-            remove_visual_indicator(self.fixed_objects[object_id]['indicator_id'])
-            
-            # Remove from dictionary
+            unfix_object_from_world(self.fixed_objects[object_id])
+            p.changeVisualShape(object_id, -1, rgbaColor=SKY_BLUE_COLOR)
             del self.fixed_objects[object_id]
+
+    def snapshot(self, output_dir="../output", width=None, height=None, flip_vertical=False):
+        """Capture a snapshot of the current viewport and save as a PNG.
+
+        Args:
+            output_dir (str): Directory to save the snapshot (relative to this file or absolute path).
+            width (int): Override capture width. If None, uses current window width.
+            height (int): Override capture height. If None, uses current window height.
+            flip_vertical (bool): Whether to vertically flip image (PyBullet origin at lower-left).
+
+        Returns:
+            str | None: Path to saved PNG (or .npy fallback) or None on failure.
+        """
+        try:
+            cam_info = p.getDebugVisualizerCamera()
+            win_w, win_h = cam_info[0], cam_info[1]
+            view_matrix = cam_info[2]
+            proj_matrix = cam_info[3]
+
+            # Use provided resolution or current window size
+            w = int(width) if width else int(win_w)
+            h = int(height) if height else int(win_h)
+
+            # Capture image
+            _, _, rgb_pixels, _, _ = p.getCameraImage(
+                width=w,
+                height=h,
+                viewMatrix=view_matrix,
+                projectionMatrix=proj_matrix,
+                renderer=p.ER_BULLET_HARDWARE_OPENGL
+            )
+
+            # Convert to numpy array (RGBA)
+            img = np.reshape(rgb_pixels, (h, w, 4))[:, :, :3]  # Drop alpha
+            if flip_vertical:
+                img = img[::-1]
+
+            # Prepare output path
+            base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), output_dir)
+            os.makedirs(base_dir, exist_ok=True)
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"snapshot_{timestamp}.png"
+            out_path = os.path.join(base_dir, filename)
+
+            # Try to save as PNG via Pillow
+            saved_path = None
+            if Image is not None:
+                Image.fromarray(img).save(out_path)
+                saved_path = out_path
+            else:
+                npy_path = out_path.replace('.png', '.npy')
+                np.save(npy_path, img)
+                saved_path = npy_path
+                print("Pillow not installed. Saved raw array as .npy instead (pip install pillow).")
+
+            print(f"Snapshot saved to: {saved_path}")
+            return saved_path
+        except Exception as e:
+            print(f"Snapshot failed: {e}")
+            return None
         

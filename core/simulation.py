@@ -12,6 +12,7 @@ import pybullet as p
 from utils.config import load_vertices_from_file, load_constraints_from_file, validate_constraints
 from utils.geometry import create_extruded_geometry, create_brick_body, create_constraints_between_bricks, transform_local_to_world_coordinates
 from utils.physics_utils import stabilize_bodies, calculate_vertex_based_forces
+from utils.geometry import create_ground_plane
 
 class Simulation:
     """
@@ -63,18 +64,29 @@ class Simulation:
         
         print(f"Loaded {len(vertices)} bricks and {len(constraints)} constraints")
         
+        # Optionally compute min z for later ground placement
+        all_z = []
+        for flat in vertices:
+            # flat list length multiple of 3
+            z_vals = flat[2::3]
+            all_z.extend(z_vals)
+        if target_vertices:
+            for flat in target_vertices:
+                all_z.extend(flat[2::3])
+        min_z = min(all_z) if all_z else 0.0
+
         # Create bricks
         local_verts_list = []  # Store local vertices for each brick
         
         # Create each brick
         for i, brick_vertices in enumerate(vertices):
             # Create extruded 3D geometry from polygon vertices
-            (local_verts, visual_indices, center) = create_extruded_geometry(
+            (local_verts, visual_indices, center, normals) = create_extruded_geometry(
                 brick_vertices, self.args.brick_thickness
             )
             
             # Create brick body in physics engine
-            brick_id = create_brick_body(local_verts, visual_indices, center)
+            brick_id = create_brick_body(local_verts, visual_indices, center, normals)
             
             brick_ids.append(brick_id)
             local_verts_list.append(local_verts)
@@ -103,6 +115,12 @@ class Simulation:
         stabilize_bodies(brick_ids, 
                         linear_damping=self.args.linear_damping, 
                         angular_damping=self.args.angular_damping)
+
+        ground_id = None
+        if getattr(self.args, 'ground_plane', False):
+            # Place ground slightly below lowest geometry to avoid interference
+            offset = min(0.1, self.args.brick_thickness)
+            ground_id = create_ground_plane(min_z - 2 * self.args.brick_thickness, offset)
         
         # Create constraints between bricks
         constraint_ids = create_constraints_between_bricks(
@@ -122,7 +140,7 @@ class Simulation:
             'target_vertices': target_bottom_vertices,
             'bricks': brick_ids,
             'local_coords': local_bottom_vertices,  # Optimized for coordinate transforms
-            'constraint_ids': constraint_ids,
+            'constraint_ids': constraint_ids
         }
         
         return self.simulation_data

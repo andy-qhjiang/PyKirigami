@@ -4,6 +4,35 @@ Geometry utilities for the kirigami simulation project.
 import numpy as np
 import pybullet as p
 
+def create_ground_plane(z, thickness, color=(0.4, 0.4, 0.4, 1.0)):
+    """Create a large axis-aligned ground box.
+
+    Args:
+        z (float): World Z coordinate of the box center (NOT the top surface).
+        thickness (float): Half-thickness of the box (full thickness = 2 * thickness).
+        color (tuple[float,float,float,float]): RGBA color.
+
+    Returns:
+        int: PyBullet body ID of the created static ground.
+    """
+    
+    ground_collision_shape = p.createCollisionShape(
+        p.GEOM_BOX,
+        halfExtents=[50, 50, thickness]
+    )
+    ground_visual_shape = p.createVisualShape(
+        p.GEOM_BOX,
+        halfExtents=[50, 50, thickness],
+        rgbaColor=list(color)
+    )
+    
+    ground_id = p.createMultiBody(
+        baseMass=0,
+        baseCollisionShapeIndex=ground_collision_shape,
+        baseVisualShapeIndex=ground_visual_shape,
+        basePosition=[0, 0, z]
+    )
+    return ground_id
 
 def create_extruded_geometry(vertices_flat, brick_thickness):
     """
@@ -46,6 +75,7 @@ def create_extruded_geometry(vertices_flat, brick_thickness):
     bottom_vertices = planar_vertices.copy() # Keep original vertices as bottom
 
     center = center + (brick_thickness / 2) * normal  # Center adjusted for thickness
+
     # Create centered vertices list for PyBullet (relative to center)
     local_verts = []
     for v in bottom_vertices:
@@ -72,10 +102,19 @@ def create_extruded_geometry(vertices_flat, brick_thickness):
         visual_indices.extend([i, num_vertices + next_i, num_vertices + i])
         # Triangle 2: bottom[i] -> top[next_i] -> bottom[next_i] 
         visual_indices.extend([i, next_i, num_vertices + next_i])
-    
-    return (local_verts, visual_indices, center.tolist())
 
-def create_brick_body(local_verts, visual_indices, center, mass=1.0):
+    
+    local_normals = []  # Reset and compute properly
+    # Bottom vertices: -normal
+    for _ in range(num_vertices):
+        local_normals.append((-normal).tolist())
+    # Top vertices: +normal
+    for _ in range(num_vertices):
+        local_normals.append(normal.tolist())
+    
+    return (local_verts, visual_indices, center.tolist(), local_normals)
+
+def create_brick_body(local_verts, visual_indices, center, local_normals,mass=1.0):
     """
     Create a brick body in PyBullet using visual indices.
     
@@ -88,18 +127,17 @@ def create_brick_body(local_verts, visual_indices, center, mass=1.0):
     Returns:
         int: PyBullet body ID
     """
-    # Set color with slight randomness
-    r = 0.529 + np.random.uniform(-0.1, 0.1)
-    g = 0.808 + np.random.uniform(-0.1, 0.1)
-    b = 0.922 + np.random.uniform(-0.1, 0.1)
-    color = [max(0, min(1, r)), max(0, min(1, g)), max(0, min(1, b)), 1]
-    
+    # Define your color palettes
+    # Unified base color (matches InteractionController SKY_BLUE_COLOR)
+    brick_color = [0.53, 0.81, 0.98, 1.0]
+
     # Create visual shape
     vis_shape = p.createVisualShape(
         shapeType=p.GEOM_MESH,
         vertices=local_verts,
         indices=visual_indices, 
-        rgbaColor=color,
+        normals=local_normals,
+        rgbaColor=brick_color,
         specularColor=[0.4, 0.4, 0.4]
     )
     
@@ -112,6 +150,7 @@ def create_brick_body(local_verts, visual_indices, center, mass=1.0):
     )
     
     # Create the multibody
+    # Create the multibody
     body_id = p.createMultiBody(
         baseMass=mass,
         baseCollisionShapeIndex=col_shape,
@@ -120,7 +159,6 @@ def create_brick_body(local_verts, visual_indices, center, mass=1.0):
     )
         
     return body_id
-
 
 def create_constraints_between_bricks(bricks, constraints_with_types, local_verts_list):
     """Create constraints between bricks based on vertex connections and type.

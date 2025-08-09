@@ -12,7 +12,6 @@ import numpy as np
 import pybullet as p
 import time
 from datetime import datetime
-from utils.physics_utils import fix_multiple_objects_to_world, unfix_multiple_objects_from_world
 from utils.geometry import transform_local_to_world_coordinates
 
 class SimulationController:
@@ -32,7 +31,6 @@ class SimulationController:
         self.simulation_data = simulation_data
         self.simulation_functions = simulation_functions
         self.is_paused = False
-        self.pause_constraints = {}
     
     def reset_simulation(self):
         """
@@ -57,7 +55,6 @@ class SimulationController:
       
         # Reset pause state
         self.is_paused = False
-        self.pause_constraints = {}
 
         print("Reset completed")
     
@@ -91,26 +88,18 @@ class SimulationController:
     
     def toggle_pause(self):
         """
-        Toggle pause state of the simulation. When paused, all objects are frozen.
+        Toggle pause state of the simulation. 
         """
         if not self.is_paused:
-            print("Pausing simulation...")
-            self.pause_constraints = fix_multiple_objects_to_world(self.simulation_data['bricks'])
             self.is_paused = True
-            print(f"Simulation paused. Fixed {len(self.pause_constraints)} objects.")
+            print(f"Simulation paused.")
         else:
-            print("Resuming simulation...")
-            unfix_multiple_objects_from_world(self.pause_constraints)
-            self.pause_constraints = {}
             self.is_paused = False
             print("Simulation resumed.")
-            
-        return self.is_paused
 
     def step_simulation(self):
         """Run one step of the simulation, applying forces if not paused."""
         if self.is_paused:
-            p.stepSimulation()  # Still step to keep GUI responsive
             return
         
         if not self.simulation_data.get('bricks'):
@@ -119,5 +108,4 @@ class SimulationController:
             
         # Apply forces (selection handled within Simulation.apply_forces)
         self.simulation_functions['apply_forces']()
-        
         p.stepSimulation()

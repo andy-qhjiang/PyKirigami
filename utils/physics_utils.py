@@ -2,8 +2,7 @@
 Physics utilities for object manipulation in PyBullet simulations, including:
 - Setting up the physics engine with gravity, timestep, and substeps 
 - stabilizing bodies with damping   
-- Creating visual indicators for fixed objects
-- Fixing and unfixing objects to/from the world frame
+- Fixing and unfixing object to/from the world frame
 """
 import numpy as np
 import pybullet as p
@@ -32,14 +31,6 @@ def setup_physics_engine(gravity=(0, 0, -9.81), timestep=1/240, substeps=10, gui
    
     return client_id
 
-def create_ground_plane():
-    """
-    Create a ground plane in the simulation.
-    
-    Returns:
-        int: The ground plane body ID
-    """
-    return p.loadURDF("plane.urdf")
 
 def stabilize_bodies(body_ids, linear_damping=1, angular_damping=1):
     """
@@ -106,87 +97,6 @@ def unfix_object_from_world(constraint_id):
         print(f"Warning: Could not remove constraint {constraint_id}: {e}")
         return False
 
-
-def create_visual_indicator(position, radius=0.08, color=[1, 0, 0, 0.8]):
-    """
-    Create a visual indicator (sphere) at a specific position.
-    
-    Args:
-        position: [x, y, z] position for the indicator
-        radius: Radius of the sphere (default: 0.08)
-        color: RGBA color [r, g, b, a] (default: red with 80% opacity)
-        
-    Returns:
-        int: Body ID of the created indicator
-    """
-    visual_shape = p.createVisualShape(
-        shapeType=p.GEOM_SPHERE,
-        radius=radius,
-        rgbaColor=color
-    )
-    
-    indicator_id = p.createMultiBody(
-        baseMass=0,  # Zero mass so physics don't affect it
-        baseVisualShapeIndex=visual_shape,
-        basePosition=position,
-        baseOrientation=[0, 0, 0, 1],
-        useMaximalCoordinates=True
-    )
-    
-    return indicator_id
-
-
-def remove_visual_indicator(indicator_id):
-    """
-    Remove a visual indicator body.
-    
-    Args:
-        indicator_id: Body ID of the indicator to remove
-        
-    Returns:
-        bool: True if indicator was successfully removed, False otherwise
-    """
-    try:
-        p.removeBody(indicator_id)
-        return True
-    except Exception as e:
-        print(f"Warning: Could not remove indicator {indicator_id}: {e}")
-        return False
-
-
-def fix_multiple_objects_to_world(object_ids, max_force=1e10):
-    """
-    Fix multiple objects to the world frame.
-    
-    Args:
-        object_ids: List of PyBullet body IDs to fix
-        max_force: Maximum force each constraint can apply
-        
-    Returns:
-        dict: Dictionary mapping object_id -> constraint_id
-    """
-    constraints = {}
-    for object_id in object_ids:
-        constraint_id = fix_object_to_world(object_id, max_force)
-        constraints[object_id] = constraint_id
-    return constraints
-
-
-def unfix_multiple_objects_from_world(constraints_dict):
-    """
-    Remove multiple constraints.
-    
-    Args:
-        constraints_dict: Dictionary mapping object_id -> constraint_id
-        
-    Returns:
-        bool: True if all constraints were successfully removed
-    """
-    success = True
-    for object_id, constraint_id in constraints_dict.items():
-        if not unfix_object_from_world(constraint_id):
-            success = False
-    return success
 
 
 def calculate_vertex_based_forces(current_vertices, target_vertices, spring_stiffness):

@@ -16,6 +16,10 @@ def load_vertices_from_file(filename):
 
     Returns:
         list: List of lists, where each sublist contains vertex coordinates for one shape.
+        [ [x1, y1, z1, x2, y2, z2, ...        xN, yN, zN] for N vertices of face 1
+          [x1, y1, z1, x2, y2, z2, ...        xN, yN, zN] for N vertices of face 2
+          ...
+        ]
     """
     vertices = []
     with open(filename, 'r') as file:
@@ -131,15 +135,5 @@ def parse_arguments():
     
     args = parser.parse_args()
 
-    # Backward-compatibility mapping for renamed parameters
-    if args.spring_stiffness is None:
-        args.spring_stiffness = args.target_stiffness
-    else:
-        args.target_stiffness = args.spring_stiffness
-
-    if args.force_damping is None:
-        args.force_damping = args.target_damping
-    else:
-        args.target_damping = args.force_damping
 
     return args

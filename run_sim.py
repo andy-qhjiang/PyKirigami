@@ -35,7 +35,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Import from existing modules
 from utils.config import *
-from utils.physics_utils import setup_physics_engine, create_ground_plane
+from utils.physics_utils import setup_physics_engine
 from core.simulation import Simulation
 from core.simulation_controller import SimulationController
 from core.interaction_controller import InteractionController
@@ -54,6 +54,7 @@ def run_simulation(args):
     # Configure debug visualizer - hide GUI panels for cleaner view
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)  # Hide GUI panels
     p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 1)  # Enable shadows for better visualization
+    p.configureDebugVisualizer(p.COV_ENABLE_KEYBOARD_SHORTCUTS, 0)
     
     # Set up camera
     p.resetDebugVisualizerCamera(
@@ -63,8 +64,7 @@ def run_simulation(args):
         cameraTargetPosition=[0, 0, 0]
     )
     
-    if args.ground_plane:
-        create_ground_plane()
+    # Ground plane (if requested) is now created inside Simulation.initialize()
 
     # Create simulation instance
     simulation = Simulation(args)
@@ -99,8 +99,9 @@ def run_simulation(args):
     print("  S - Save vertex locations")
     print("  P - Toggle pause/resume")
     print("  Q - Quit simulation")
+    print("  C - Capture snapshot (saved to output directory)")
     print("Mouse Controls:")
-    print("  Right-click on a brick - Toggle fix/unfix (red sphere indicates fixed)")
+    print("  Right-click on a brick - Toggle fix/unfix (burnt orange = fixed, sky blue = free)")
     
     # Main simulation loop
     try:
@@ -127,6 +128,8 @@ def run_simulation(args):
             if ord('q') in keys and keys[ord('q')] & p.KEY_WAS_TRIGGERED:
                 print("Quitting simulation...")
                 break
+            if ord('c') in keys and keys[ord('c')] & p.KEY_WAS_TRIGGERED:
+                interaction_controller.snapshot(width=2400, height=1800)
             
             # Process mouse events for interaction controller (e.g., toggling fixed state)
             interaction_controller.process_mouse_events() 
