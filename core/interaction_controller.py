@@ -12,19 +12,17 @@ import numpy as np
 import math
 import os
 from datetime import datetime
+from utils.physics_utils import fix_object_to_world, unfix_object_from_world
 
 # Optional Pillow import for snapshot PNG saving (handled gracefully if absent)
 try:
     from PIL import Image  # noqa: F401
 except ImportError:  # Pillow not installed; snapshot will fall back to .npy
     Image = None
-from utils.physics_utils import (
-    fix_object_to_world, unfix_object_from_world,
-)
 
-# Fixed highlight color (simplified – project chooses a single highlight scheme)
-FIXED_HIGHLIGHT_COLOR = [0.95, 0.55, 0.15, 1.0]  # warm orange
-SKY_BLUE_COLOR = [0.53, 0.81, 0.98, 1.0]  # sky blue (base color for free bricks)
+
+BRICK_COLOR = [0.98, 0.8, 0.43, 1.0]      # Default brick color
+FIXED_COLOR = [1, 0.47, 0.47, 1.0]       # Fixed brick color
 
 
 
@@ -48,18 +46,18 @@ class InteractionController:
     def toggle_static(self, object_id):
         """Toggle an object between free and fixed states.
 
-        Free brick  -> apply FIXED_HIGHLIGHT_COLOR and add fixed constraint.
-        Fixed brick -> revert to SKY_BLUE_COLOR and remove constraint.
+    Free brick  -> apply FIXED_COLOR and add fixed constraint.
+    Fixed brick -> revert to BRICK_COLOR and remove constraint.
         """
         if object_id in self.fixed_objects:  # currently fixed -> free it
             unfix_object_from_world(self.fixed_objects[object_id])
             del self.fixed_objects[object_id]
-            p.changeVisualShape(object_id, -1, rgbaColor=SKY_BLUE_COLOR)
+            p.changeVisualShape(object_id, -1, rgbaColor=BRICK_COLOR)
             print(f"Brick {object_id} is free.")
         else:  # currently free -> fix it
             constraint_id = fix_object_to_world(object_id)
             self.fixed_objects[object_id] = constraint_id
-            p.changeVisualShape(object_id, -1, rgbaColor=FIXED_HIGHLIGHT_COLOR)
+            p.changeVisualShape(object_id, -1, rgbaColor=FIXED_COLOR)
             print(f"Brick {object_id} is fixed.")
             
     def process_mouse_events(self):
@@ -157,7 +155,7 @@ class InteractionController:
         fixed_ids = list(self.fixed_objects.keys())
         for object_id in fixed_ids:
             unfix_object_from_world(self.fixed_objects[object_id])
-            p.changeVisualShape(object_id, -1, rgbaColor=SKY_BLUE_COLOR)
+            p.changeVisualShape(object_id, -1, rgbaColor=BRICK_COLOR)
             del self.fixed_objects[object_id]
 
     def snapshot(self, output_dir="../output", width=None, height=None, flip_vertical=False):

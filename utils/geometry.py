@@ -4,6 +4,8 @@ Geometry utilities for the kirigami simulation project.
 import numpy as np
 import pybullet as p
 
+BRICK_COLOR = [0.98, 0.8, 0.43, 1.0] # Default brick color
+
 def create_ground_plane(z, thickness, color=(0.4, 0.4, 0.4, 1.0)):
     """Create a large axis-aligned ground box.
 
@@ -127,9 +129,8 @@ def create_brick_body(local_verts, visual_indices, center, local_normals,mass=1.
     Returns:
         int: PyBullet body ID
     """
-    # Define your color palettes
-    # Unified base color (matches InteractionController SKY_BLUE_COLOR)
-    brick_color = [0.53, 0.81, 0.98, 1.0]
+    # Use centralized brick color
+    brick_color = BRICK_COLOR
 
     # Create visual shape
     vis_shape = p.createVisualShape(

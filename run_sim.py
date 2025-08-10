@@ -13,7 +13,6 @@ Usage:
     # Basic simulation with physics only (no deployment forces)
     python run_sim.py --vertices_file fan_R10_r1_w3_h3_vertices.txt --constraints_file fan_R10_r1_w3_h3_constraints.txt  --ground_plane --gravity -200 --brick_thickness 0.1
 
-
     # auto_expansion deployment:
     python run_sim.py --vertices_file stampfli24_vertices_scaled.txt --constraints_file stampfli24_expansion_constraints.txt --ground_plane --gravity -100 --brick_thickness 0.1 --auto_expansion --camera_distance 12
     
@@ -40,7 +39,6 @@ from core.simulation import Simulation
 from core.simulation_controller import SimulationController
 from core.interaction_controller import InteractionController
 
-
 def run_simulation(args):
     """Run the kirigami simulation with the specified parameters"""
     
@@ -54,8 +52,8 @@ def run_simulation(args):
     # Configure debug visualizer - hide GUI panels for cleaner view
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)  # Hide GUI panels
     p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 1)  # Enable shadows for better visualization
-    p.configureDebugVisualizer(p.COV_ENABLE_KEYBOARD_SHORTCUTS, 0)
-    
+    p.configureDebugVisualizer(p.COV_ENABLE_KEYBOARD_SHORTCUTS, 0) # avoid conflict between default shortcuts and user-defined shortcuts
+
     # Set up camera
     p.resetDebugVisualizerCamera(
         cameraDistance=args.camera_distance if hasattr(args, 'camera_distance') else 8.0,
@@ -64,8 +62,6 @@ def run_simulation(args):
         cameraTargetPosition=[0, 0, 0]
     )
     
-    # Ground plane (if requested) is now created inside Simulation.initialize()
-
     # Create simulation instance
     simulation = Simulation(args)
     
@@ -101,7 +97,7 @@ def run_simulation(args):
     print("  Q - Quit simulation")
     print("  C - Capture snapshot (saved to output directory)")
     print("Mouse Controls:")
-    print("  Right-click on a brick - Toggle fix/unfix (burnt orange = fixed, sky blue = free)")
+    print("  Right-click on a brick - Toggle fix/unfix")
     
     # Main simulation loop
     try:
@@ -129,7 +125,7 @@ def run_simulation(args):
                 print("Quitting simulation...")
                 break
             if ord('c') in keys and keys[ord('c')] & p.KEY_WAS_TRIGGERED:
-                interaction_controller.snapshot(width=2400, height=1800)
+                interaction_controller.snapshot(width=3800, height=2160)
             
             # Process mouse events for interaction controller (e.g., toggling fixed state)
             interaction_controller.process_mouse_events() 
