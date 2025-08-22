@@ -13,13 +13,13 @@ Usage:
     # Basic simulation with physics only (no deployment forces)
     python run_sim.py --vertices_file fan_R10_r1_w3_h3_vertices.txt --constraints_file fan_R10_r1_w3_h3_constraints.txt  --ground_plane --gravity -200 --brick_thickness 0.1
 
-    # auto_expansion deployment:
-    python run_sim.py --vertices_file stampfli24_vertices_scaled.txt --constraints_file stampfli24_expansion_constraints.txt --ground_plane --gravity -100 --brick_thickness 0.1 --auto_expansion --camera_distance 12
+    # cm_expansion deployment:
+    python run_sim.py --vertices_file stampfli24_vertices_scaled.txt --constraints_file stampfli24_expansion_constraints.txt --ground_plane --gravity -100 --brick_thickness 0.1 --cm_expansion --camera_distance 12
     
     # Target-based deployment examples:
     python run_sim.py --vertices_file cylinder_vertices.txt --constraints_file cylinder_constraints.txt --target_vertices_file cylinder_target.txt  --brick_thickness 0.1 --camera_distance 15
 
-    python run_sim.py --vertices_file cube2sphere_w4_h4_vertices.txt --constraints_file cube2sphere_w4_h4_constraints.txt --target_vertices_file cube2sphere_w4_h4_target.txt --brick_thickness 0.02
+    python run_sim.py --vertices_file cube2sphere_w3_h3_vertices.txt --constraints_file cube2sphere_w3_h3_constraints.txt --target_vertices_file cube2sphere_w3_h3_target.txt --brick_thickness 0.02
 
     python run_sim.py --vertices_file partialSphere_vertices.txt --constraints_file partialSphere_constraints.txt --target_vertices_file partialSphere_target.txt  --brick_thickness 0.02
 """
@@ -93,7 +93,7 @@ def run_simulation(args):
     print("Keyboard Controls:")
     print("  R - Reset simulation")
     print("  S - Save vertex locations")
-    print("  P - Toggle pause/resume")
+    print("  Space - Toggle pause/resume")
     print("  Q - Quit simulation")
     print("  C - Capture snapshot (saved to output directory)")
     print("Mouse Controls:")
@@ -118,7 +118,7 @@ def run_simulation(args):
             if ord('s') in keys and keys[ord('s')] & p.KEY_WAS_TRIGGERED:
                 simulation_controller.save_vertex_locations()
 
-            if ord('p') in keys and keys[ord('p')] & p.KEY_WAS_TRIGGERED:
+            if ord(' ') in keys and keys[ord(' ')] & p.KEY_WAS_TRIGGERED:
                 simulation_controller.toggle_pause()
 
             if ord('q') in keys and keys[ord('q')] & p.KEY_WAS_TRIGGERED:
@@ -126,11 +126,11 @@ def run_simulation(args):
                 break
             if ord('c') in keys and keys[ord('c')] & p.KEY_WAS_TRIGGERED:
                 interaction_controller.snapshot(width=3800, height=2160)
-            
+
             # Process mouse events for interaction controller (e.g., toggling fixed state)
             interaction_controller.process_mouse_events() 
             
-            # Step simulation (applies forces, calls p.stepSimulation())
+            # Step simulation (calculate all forces and detect collision in Bullet engine)
             simulation_controller.step_simulation()
 
             time.sleep(args.timestep)

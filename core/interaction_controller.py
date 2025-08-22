@@ -14,6 +14,7 @@ import os
 from datetime import datetime
 from utils.physics_utils import fix_object_to_world, unfix_object_from_world
 
+
 # Optional Pillow import for snapshot PNG saving (handled gracefully if absent)
 try:
     from PIL import Image  # noqa: F401
@@ -21,8 +22,8 @@ except ImportError:  # Pillow not installed; snapshot will fall back to .npy
     Image = None
 
 
-BRICK_COLOR = [0.98, 0.8, 0.43, 1.0]      # Default brick color
-FIXED_COLOR = [1, 0.47, 0.47, 1.0]       # Fixed brick color
+BRICK_COLOR = [0.8, 0.35, 0.13, 1.0]      # Default brick color
+FIXED_COLOR = [0.53, 0.81, 0.92, 1.0]       # Fixed brick color
 
 
 
@@ -41,6 +42,9 @@ class InteractionController:
         self.simulation_data = simulation_data
         # Track fixed objects
         self.fixed_objects = {}        # {body_id: constraint_id}
+        # Recording state
+        self._recording = False
+        self._record = None
     
     
     def toggle_static(self, object_id):
@@ -218,4 +222,3 @@ class InteractionController:
         except Exception as e:
             print(f"Snapshot failed: {e}")
             return None
-        

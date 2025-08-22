@@ -4,8 +4,6 @@ Geometry utilities for the kirigami simulation project.
 import numpy as np
 import pybullet as p
 
-BRICK_COLOR = [0.98, 0.8, 0.43, 1.0] # Default brick color
-
 def create_ground_plane(z, thickness, color=(0.4, 0.4, 0.4, 1.0)):
     """Create a large axis-aligned ground box.
 
@@ -20,21 +18,22 @@ def create_ground_plane(z, thickness, color=(0.4, 0.4, 0.4, 1.0)):
     
     ground_collision_shape = p.createCollisionShape(
         p.GEOM_BOX,
-        halfExtents=[50, 50, thickness]
+        halfExtents=[50000, 50000, thickness]
     )
     ground_visual_shape = p.createVisualShape(
         p.GEOM_BOX,
-        halfExtents=[50, 50, thickness],
-        rgbaColor=list(color)
+        halfExtents=[50000, 50000, thickness],
+        rgbaColor=list(color),
+        visualFrameOrientation=[-0.1, -0.2, -0.2, 1]
     )
     
-    ground_id = p.createMultiBody(
+    p.createMultiBody(
         baseMass=0,
         baseCollisionShapeIndex=ground_collision_shape,
         baseVisualShapeIndex=ground_visual_shape,
         basePosition=[0, 0, z]
     )
-    return ground_id
+    
 
 def create_extruded_geometry(vertices_flat, brick_thickness):
     """
@@ -129,8 +128,13 @@ def create_brick_body(local_verts, visual_indices, center, local_normals,mass=1.
     Returns:
         int: PyBullet body ID
     """
-    # Use centralized brick color
-    brick_color = BRICK_COLOR
+
+    # Set color with slight randomness (terracotta base)
+    r = 0.8 + np.random.uniform(-0.1, 0.1)
+    g = 0.4 + np.random.uniform(-0.1, 0.1)
+    b = 0.2 + np.random.uniform(-0.1, 0.1)
+    color = [min(1, r), min(1, g), min(1, b), 1]
+    brick_color = color
 
     # Create visual shape
     vis_shape = p.createVisualShape(

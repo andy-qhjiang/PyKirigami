@@ -105,20 +105,20 @@ def parse_arguments():
     parser.add_argument('--timestep', type=float, default=1/240, help='Physics simulation timestep')
     parser.add_argument('--substeps', type=int, default=20, help='Physics substeps per step')
     
-    
-    
-    # Versatile force model parameters (preferred)
-    parser.add_argument('--spring_stiffness', type=float, default=500,
+
+
+    # target_based deployment parameters
+    parser.add_argument('--spring_stiffness', type=float, default=300,
                        help='Generic spring stiffness used by force models (replaces --target_stiffness)')
     parser.add_argument('--force_damping', type=float, default=50,
                        help='Generic damping used by force models (replaces --target_damping)')
 
-    # Auto expansion mode (alternative to target-based)
-    parser.add_argument('--auto_expansion', action='store_true',
-                       help='Enable automatic expansion using center-of-mass based forces')
-    
-    
-    
+    # Center-of-mass expansion mode
+    parser.add_argument('--cm_expansion', action='store_true',
+                       help='Enable center-of-mass based expansion forces')
+
+
+
     # Geometry parameters
     parser.add_argument('--brick_thickness', type=float, default=0.02,
                        help='Thickness of the brick (z-height)')

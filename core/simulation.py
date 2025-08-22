@@ -10,9 +10,8 @@ This module handles the initialization of the kirigami simulation, including:
 import numpy as np
 import pybullet as p
 from utils.config import load_vertices_from_file, load_constraints_from_file, validate_constraints
-from utils.geometry import create_extruded_geometry, create_brick_body, create_constraints_between_bricks, transform_local_to_world_coordinates
+from utils.geometry import create_extruded_geometry, create_brick_body, create_constraints_between_bricks, transform_local_to_world_coordinates, create_ground_plane
 from utils.physics_utils import stabilize_bodies, calculate_vertex_based_forces
-from utils.geometry import create_ground_plane
 
 class Simulation:
     """
@@ -116,12 +115,11 @@ class Simulation:
                         linear_damping=self.args.linear_damping, 
                         angular_damping=self.args.angular_damping)
 
-        ground_id = None
         if getattr(self.args, 'ground_plane', False):
             # Place ground slightly below lowest geometry to avoid interference
-            offset = min(0.1, self.args.brick_thickness)
-            ground_id = create_ground_plane(min_z - 2 * self.args.brick_thickness, offset)
-        
+            offset = max(0.1, self.args.brick_thickness)
+            create_ground_plane(z=min_z - 20*offset, thickness=0.1)
+
         # Create constraints between bricks
         constraint_ids = create_constraints_between_bricks(
             brick_ids, constraints, local_verts_list
@@ -149,17 +147,17 @@ class Simulation:
         """
         Choose and apply forces based on configuration:
         - If target vertices are provided, apply target-driven vertex forces.
-        - Else if auto_expansion is enabled, apply center-of-mass expansion forces.
+        - Else if cm_expansion is enabled, apply center-of-mass expansion forces.
         """
-        args = self.simulation_data.get('args') # to check whether auto_expansion is enabled
+        args = self.simulation_data.get('args') # to check whether cm_expansion is enabled
 
         # Target-driven deployment takes precedence when available
         if self.simulation_data.get('target_vertices') and getattr(args, 'target_vertices_file', None):
             self._apply_target_based_forces()
             return
 
-        # Auto expansion as an alternative mode
-        if getattr(args, 'auto_expansion', False):
+        # Center-of-mass expansion as an alternative mode
+        if getattr(args, 'cm_expansion', False):
             self._apply_expansion_forces()
     
     def _apply_target_based_forces(self):

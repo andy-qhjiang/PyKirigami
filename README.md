@@ -1,9 +1,6 @@
 # PyKirigami: An Interactive Python Simulator for Kirigami Metamaterials
 
-<div align="center">
-  <img src="./gallery/partialSphere_demo.gif" alt="Partial Sphere Demo" width="45%" />
-  <img src="./gallery/cylinder_demo.gif" alt="Cylinder Demo" width="45%" />
-</div>
+<div align="center"> <img src="./gallery/partialSphere_demo.gif" alt="Partial Sphere Demo" width="49%"> <img src="./gallery/cylinder_demo.gif" alt="Cylinder Demo" width="49.3%"> </div>
 
 ## Table of Contents
 
@@ -742,30 +739,24 @@ The simulation maintains a central data dictionary that coordinates state across
 - **Visualization Features**: Modify rendering setup in `physics_utils.py`
 - **Simulation Analytics**: Access central data structure for real-time analysis
 
----
 
-## Technical Background
-[Theoretical foundations and implementation details]
 
 ---
 
 ## Frequently Asked Questions (FAQ)
 [Common questions and answers]
 
----
-
-## Contributing
-[Guidelines for contributing to the project]
 
 ---
 
 ## Citation
 ```bibtex
 @article{pykirigami2025,
-    title={PyKirigami: An interactive Python simulator for kirigami metamaterials},
-    author={Jiang, Qinghai and Choi, Gary P. T.},
-    journal=
-    year=
+    title = {PyKirigami: An interactive Python simulator for kirigami metamaterials},
+    author = {Jiang, Qinghai and Choi, Gary P. T.},
+    journal = {arXiv preprint arXiv:2508.15753},
+    url = {https://arxiv.org/abs/2508.15753},
+    year = {2025}
 }
 ```
 
