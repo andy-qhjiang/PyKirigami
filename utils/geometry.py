@@ -24,7 +24,7 @@ def create_ground_plane(z, thickness, color=(0.4, 0.4, 0.4, 1.0)):
         p.GEOM_BOX,
         halfExtents=[50000, 50000, thickness],
         rgbaColor=list(color),
-        visualFrameOrientation=[-0.1, -0.2, -0.2, 1]
+        visualFrameOrientation=[0, 0, 0, 1]
     )
     
     p.createMultiBody(

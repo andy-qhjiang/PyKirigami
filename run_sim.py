@@ -22,6 +22,10 @@ Usage:
     python run_sim.py --vertices_file cube2sphere_w3_h3_vertices.txt --constraints_file cube2sphere_w3_h3_constraints.txt --target_vertices_file cube2sphere_w3_h3_target.txt --brick_thickness 0.02
 
     python run_sim.py --vertices_file partialSphere_vertices.txt --constraints_file partialSphere_constraints.txt --target_vertices_file partialSphere_target.txt  --brick_thickness 0.02
+
+    python run_sim.py --vertices_file heart_vertices.txt --constraints_file heart_constraints.txt --ground_plane --gravity -500 --brick_thickness 0.1 --target_vertices_file heart_target.txt --spring_stiffness 400 --force_damping 100 --camera_distance 8
+
+    python run_sim.py --vertices_file square2disk_vertices.txt --constraints_file square2disk_constraints.txt --target_vertices_file square2disk_target.txt --ground_plane --brick_thickness 0.1 --gravity -200 --spring_stiffness 250
 """
 import os
 import sys
