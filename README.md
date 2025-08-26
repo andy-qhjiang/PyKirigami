@@ -9,7 +9,7 @@
 #### Interactive Python 3D/2D kirigami simulation library
 
 [Manual](https://github.com/andy-qhjiang/PyKirigami/wiki/Manual) —
-[Questions](https://github.com/andy-qhjiang/PyKirigami/issues) —
+[Discussions](https://github.com/andy-qhjiang/PyKirigami/discussions) —
 [Releases](https://github.com/andy-qhjiang/PyKirigami/releases)
 
 <table>
