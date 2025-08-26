@@ -12,32 +12,6 @@
 [Questions](https://github.com/andy-qhjiang/PyKirigami/issues) —
 [Releases](https://github.com/andy-qhjiang/PyKirigami/releases)
 
-### Getting Started
-
-Prerequisites:
-- Python 3.8+
-
-Install with conda-forge (recommended on Windows/macOS):
-```bash
-conda create -n kirigami python=3.13
-conda activate kirigami
-conda install -c conda-forge numpy pybullet
-```
-
-### Quick Usage
-
-Run the following command and you will get figure (b):
-
-```bash
-python run_sim.py --vertices_file data/partialSphere_vertices.txt --constraints_file data/partialSphere_constraints.txt --target_vertices_file data/partialSphere_target.txt --brick_thickness 0.02 --spring_stiffness 800
-```
-
-Run the following command and you will get figure (d):
-
-```bash
-python run_sim.py --vertices_file square2disk_vertices.txt --constraints_file square2disk_constraints.txt --target_vertices_file square2disk_target.txt --ground_plane --brick_thickness 0.1 --gravity -200 --force_damping 20
-```
-
 <table>
   <tr>
     <td width="45%">
@@ -61,6 +35,33 @@ python run_sim.py --vertices_file square2disk_vertices.txt --constraints_file sq
   </tr>
   
 </table>
+
+### Getting Started
+
+Prerequisites:
+- Python 3.8+
+
+Install with conda-forge (recommended on Windows/macOS):
+```bash
+conda create -n kirigami python=3.13
+conda activate kirigami
+conda install -c conda-forge numpy pybullet
+```
+
+### Quick Usage
+
+Run the following command and you will get demo (b):
+
+```bash
+python run_sim.py --vertices_file data/partialSphere_vertices.txt --constraints_file data/partialSphere_constraints.txt --target_vertices_file data/partialSphere_target.txt --brick_thickness 0.02 --spring_stiffness 800
+```
+
+Run the following command and you will get demo (d):
+
+```bash
+python run_sim.py --vertices_file square2disk_vertices.txt --constraints_file square2disk_constraints.txt --target_vertices_file square2disk_target.txt --ground_plane --brick_thickness 0.1 --gravity -200 --force_damping 20
+```
+
 
 ## Documentation
 Full manual is in the Wiki 
