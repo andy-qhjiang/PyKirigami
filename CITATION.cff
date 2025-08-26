@@ -1,0 +1,40 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "PyKirigami: An Interactive Python Simulator for Kirigami Metamaterials"
+authors:
+  - family-names: Jiang
+    given-names: Qinghai
+    affiliation: Department of Mathematics, The Chinese University of Hong Kong
+    email: qhjiang@math.cuhk.edu.hk
+  - family-names: Choi
+    given-names: Gary P. T.
+    affiliation: Department of Mathematics, The Chinese University of Hong Kong
+    email: ptchoi@cuhk.edu.hk
+repository-code: "https://github.com/andy-qhjiang/PyKirigami"
+license: "Apache-2.0"
+keywords:
+  - kirigami
+  - simulation
+  - pybullet
+  - metamaterials
+  - 3D
+  - physics
+abstract: >-
+  PyKirigami is an open-source Python simulator for 2D/3D deployment of kirigami
+  metamaterials with target-based forces, interactive controls, and export tools.
+version: "0.1.0"
+date-released: "2025-01-01"
+preferred-citation:
+  type: article
+  title: "PyKirigami: An interactive Python simulator for kirigami metamaterials"
+  authors:
+    - family-names: Jiang
+      given-names: Qinghai
+    - family-names: Choi
+      given-names: Gary P. T.
+  year: 2025
+  journal: "arXiv preprint arXiv:2508.15753"
+  url: "https://arxiv.org/abs/2508.15753"
+  identifiers:
+    - type: url
+      value: "https://arxiv.org/abs/2508.15753"

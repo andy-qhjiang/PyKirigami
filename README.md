@@ -1,19 +1,13 @@
 # PyKirigami: An Interactive Python Simulator for Kirigami Metamaterials
 
-[![Stars](https://img.shields.io/github/stars/andy-qhjiang/PyKirigami?style=social)](https://github.com/andy-qhjiang/PyKirigami/stargazers)
-[![Issues](https://img.shields.io/github/issues/andy-qhjiang/PyKirigami)](https://github.com/andy-qhjiang/PyKirigami/issues)
-[![Last Commit](https://img.shields.io/github/last-commit/andy-qhjiang/PyKirigami)](https://github.com/andy-qhjiang/PyKirigami/commits/main)
-[![License](https://img.shields.io/github/license/andy-qhjiang/PyKirigami)](https://github.com/andy-qhjiang/PyKirigami/blob/main/LICENSE)
-[![Python](https://img.shields.io/badge/python-3.8%2B-blue)](#)
 
-#### Interactive Python 3D/2D kirigami simulation library
+PyKirigami is an open-source Python toolbox for simulating the 2D and 3D deployment of general kirigami metamaterials. The simulator utilizes the PyBullet physics engine and is capable of simulating 2D-to-2D, 2D-to-3D, and 3D-to-3D kirigami deployments with interactive controls.
 
 [Examples](https://github.com/andy-qhjiang/PyKirigami/tree/main/gallery) —
 [Manual](https://github.com/andy-qhjiang/PyKirigami/wiki/Manual) —
 [Discussions](https://github.com/andy-qhjiang/PyKirigami/discussions) —
-[Citation](#citation)-
-[License](#license)-
-[Releases](https://github.com/andy-qhjiang/PyKirigami/releases)
+[Citation](#citation) —
+[License](#license) 
 
 <table>
   <tr>
