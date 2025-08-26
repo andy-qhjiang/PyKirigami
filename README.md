@@ -1,5 +1,31 @@
 # PyKirigami: An Interactive Python Simulator for Kirigami Metamaterials
 
+[![Stars](https://img.shields.io/github/stars/andy-qhjiang/PyKirigami?style=social)](https://github.com/andy-qhjiang/PyKirigami/stargazers)
+[![Issues](https://img.shields.io/github/issues/andy-qhjiang/PyKirigami)](https://github.com/andy-qhjiang/PyKirigami/issues)
+[![Last Commit](https://img.shields.io/github/last-commit/andy-qhjiang/PyKirigami)](https://github.com/andy-qhjiang/PyKirigami/commits/main)
+[![License](https://img.shields.io/github/license/andy-qhjiang/PyKirigami)](https://github.com/andy-qhjiang/PyKirigami/blob/main/LICENSE)
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue)](#)
+
+#### Interactive Python 3D/2D kirigami simulation library
+
+[Manual](https://github.com/andy-qhjiang/PyKirigami/wiki/Manual) —
+[Questions](https://github.com/andy-qhjiang/PyKirigami/issues) —
+[Releases](https://github.com/andy-qhjiang/PyKirigami/releases)
+
+### Quick Usage
+
+Run a partial_sphere demo (fig.1-2):
+
+```bash
+python run_sim.py --vertices_file data/partialSphere_vertices.txt --constraints_file data/partialSphere_constraints.txt --target_vertices_file data/partialSphere_target.txt --brick_thickness 0.02 --spring_stiffness 800
+```
+
+Run a square_to_disk demo (fig. 2-2):
+
+```bash
+python run_sim.py --vertices_file square2disk_vertices.txt --constraints_file square2disk_constraints.txt --target_vertices_file square2disk_target.txt --ground_plane --brick_thickness 0.1 --gravity -200 --force_damping 20
+```
+
 <table>
   <tr>
     <td width="45%">
