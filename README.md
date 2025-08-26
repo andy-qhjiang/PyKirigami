@@ -12,15 +12,27 @@
 [Questions](https://github.com/andy-qhjiang/PyKirigami/issues) —
 [Releases](https://github.com/andy-qhjiang/PyKirigami/releases)
 
+### Getting Started
+
+Prerequisites:
+- Python 3.8+
+
+Install with conda-forge (recommended on Windows/macOS):
+```bash
+conda create -n kirigami python=3.13
+conda activate kirigami
+conda install -c conda-forge numpy pybullet
+```
+
 ### Quick Usage
 
-Run a partial_sphere demo (fig.1-2):
+Run the following command and you will get figure (b):
 
 ```bash
 python run_sim.py --vertices_file data/partialSphere_vertices.txt --constraints_file data/partialSphere_constraints.txt --target_vertices_file data/partialSphere_target.txt --brick_thickness 0.02 --spring_stiffness 800
 ```
 
-Run a square_to_disk demo (fig. 2-2):
+Run the following command and you will get figure (d):
 
 ```bash
 python run_sim.py --vertices_file square2disk_vertices.txt --constraints_file square2disk_constraints.txt --target_vertices_file square2disk_target.txt --ground_plane --brick_thickness 0.1 --gravity -200 --force_damping 20
@@ -30,25 +42,29 @@ python run_sim.py --vertices_file square2disk_vertices.txt --constraints_file sq
   <tr>
     <td width="45%">
       <img src="gallery/cylinder_demo.gif" alt="Cylinder" width="96%" loading="lazy" />
-      <div align="center"><small></small></div>
+      <div align="center"><small>(a)</small></div>
     </td>
     <td width="55%">
       <img src="gallery/partialSphere.gif" alt="Partial Sphere" width="100%" loading="lazy" />
-      <div align="center"><small></small></div>
+      <div align="center"><small>(b)</small></div>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <img src="gallery/heart_demo.gif" alt="Demo 3" width="100%" loading="lazy" />
-      <div align="center"><small></small></div>
+      <div align="center"><small>(c)</small></div>
     </td>
     <td width="50%">
       <img src="gallery/s2d.gif" alt="Demo 4" width="95%" loading="lazy" />
-      <div align="center"><small></small></div>
+      <div align="center"><small>(d)</small></div>
     </td>
   </tr>
   
 </table>
+
+## Documentation
+Full manual is in the Wiki 
+https://github.com/andy-qhjiang/PyKirigami/wiki/Manual
 
 ## Table of Contents
 
