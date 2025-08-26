@@ -1,6 +1,31 @@
 # PyKirigami: An Interactive Python Simulator for Kirigami Metamaterials
 
-<table> <tr> <td width="50%"> <video src="gallery/cylinder_demo.mp4" width="100%" controls muted playsinline></video> <div align="center"><small>Cylinder</small></div> </td> <td width="50%"> <video src="gallery/partialSphere.mp4" width="100%" controls muted playsinline></video> <div align="center"><small>Partial Sphere</small></div> </td> </tr> <tr> <td width="50%"> <video src="gallery/heart_demo.mp4" width="100%" controls muted playsinline></video> <div align="center"><small>Demo 3</small></div> </td> <td width="50%"> <video src="gallery/s2d.mp4" width="100%" controls muted playsinline></video> <div align="center"><small>Demo 4</small></div> </td> </tr> </table>
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <video src="gallery/cylinder_demo.mp4" width="100%" autoplay loop muted playsinline></video>
+      <br />
+      <small>Cylinder</small>
+    </td>
+    <td width="50%" align="center">
+      <video src="gallery/partialSphere.mp4" width="100%" autoplay loop muted playsinline></video>
+      <br />
+      <small>Partial Sphere</small>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <video src="gallery/heart_demo.mp4" width="100%" autoplay loop muted playsinline></video>
+      <br />
+      <small>Heart Pattern</small>
+    </td>
+    <td width="50%" align="center">
+      <video src="gallery/s2d.mp4" width="100%" autoplay loop muted playsinline></video>
+      <br />
+      <small>Sphere to Disc</small>
+    </td>
+  </tr>
+</table>
 
 ## Table of Contents
 
