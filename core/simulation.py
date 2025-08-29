@@ -80,12 +80,12 @@ class Simulation:
         # Create each brick
         for i, brick_vertices in enumerate(vertices):
             # Create extruded 3D geometry from polygon vertices
-            (local_verts, visual_indices, center, normals) = create_extruded_geometry(
+            (local_verts, visual_indices, center, vis_normals, vis_vertices) = create_extruded_geometry(
                 brick_vertices, self.args.brick_thickness
             )
             
             # Create brick body in physics engine
-            brick_id = create_brick_body(local_verts, visual_indices, center, normals)
+            brick_id = create_brick_body(local_verts, visual_indices, center, vis_normals, vis_vertices)
             
             brick_ids.append(brick_id)
             local_verts_list.append(local_verts)
@@ -118,7 +118,7 @@ class Simulation:
         if getattr(self.args, 'ground_plane', False):
             # Place ground slightly below lowest geometry to avoid interference
             offset = max(0.1, self.args.brick_thickness)
-            create_ground_plane(z=min_z - 20*offset, thickness=0.1)
+            create_ground_plane(z=min_z - 2*offset, thickness=0.1)
 
         # Create constraints between bricks
         constraint_ids = create_constraints_between_bricks(
