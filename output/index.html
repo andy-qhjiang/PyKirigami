@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyKirigami OBJ Viewer</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <!-- This is where your 3D scene will be rendered -->
+
+    <!-- Import three.js and its loaders from a CDN (Content Delivery Network) -->
+    <script type="module">
+        import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
+        import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js';
+        import { MTLLoader } from 'https://unpkg.com/three@0.158.0/examples/jsm/loaders/MTLLoader.js';
+        import { OBJLoader } from 'https://unpkg.com/three@0.158.0/examples/jsm/loaders/OBJLoader.js';
+
+        // --- 1. Basic Scene Setup ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf0f0f0); // A light gray background
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0.5, 0.5, 1.5); // Start the camera a bit further back
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // --- 2. Controls ---
+        // OrbitControls allow you to rotate, pan, and zoom the scene with your mouse
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; // Makes the controls feel smoother
+        controls.dampingFactor = 0.05;
+
+        // --- 3. Lighting ---
+        // Ambient light illuminates all objects in the scene from all directions
+        const ambientLight = new THREE.AmbientLight(0x404040, 2);
+        scene.add(ambientLight);
+
+        // Directional light acts like the sun, casting shadows
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+
+        // --- 4. Load your OBJ and MTL files ---
+        // Replace 'scene_name' with the actual name of your files.
+        const mtlFile = 'scene_1756683360.mtl';
+        const objFile = 'scene_1756683360.obj';
+
+        const mtlLoader = new MTLLoader();
+        mtlLoader.load(mtlFile, (materials) => {
+            materials.preload();
+
+            const objLoader = new OBJLoader();
+            objLoader.setMaterials(materials);
+            objLoader.load(objFile, (object) => {
+                // The 'object' is a THREE.Group containing all your tiles
+                scene.add(object);
+
+                // Optional: Automatically center and frame the object
+                const box = new THREE.Box3().setFromObject(object);
+                const center = box.getCenter(new THREE.Vector3());
+                controls.target.copy(center); // Point the camera at the object's center
+                object.position.sub(center); // Center the object at the world origin
+
+                controls.update();
+            },
+            // onProgress callback (optional)
+            (xhr) => {
+                console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+            },
+            // onError callback (optional)
+            (error) => {
+                console.error('An error happened while loading the OBJ file:', error);
+            });
+        });
+
+        // --- 5. Animation Loop ---
+        // This function is called every frame to render the scene
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update(); // Required if damping is enabled
+            renderer.render(scene, camera);
+        }
+
+        // --- 6. Handle Window Resizing ---
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        window.addEventListener('resize', onWindowResize);
+
+        // Start the animation loop
+        animate();
+    </script>
+</body>
+</html>
