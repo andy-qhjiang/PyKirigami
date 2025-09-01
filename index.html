@@ -35,13 +35,13 @@ const mtlLoader = new MTLLoader();
 mtlLoader.setPath(ASSET_PATH);
 mtlLoader.setResourcePath(ASSET_PATH); // if MTL references textures
 
-mtlLoader.load(${SCENE_NAME}.mtl, (materials) => {
+mtlLoader.load(`${SCENE_NAME}.mtl`, (materials) => {
 materials.preload();
 const objLoader = new OBJLoader();
 objLoader.setMaterials(materials);
 objLoader.setPath(ASSET_PATH);
 
-objLoader.load(${SCENE_NAME}.obj, (obj) => {
+objLoader.load(`${SCENE_NAME}.obj`, (obj) => {
 // Convert PyBullet Z-up -> three.js Y-up
 obj.rotation.x = -Math.PI / 2;
 
