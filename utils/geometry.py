@@ -4,7 +4,7 @@ Geometry utilities for the kirigami simulation project.
 import numpy as np
 import pybullet as p
 
-def create_ground_plane(z, thickness, color=(0.9, 0.9, 0.9, 1.0)):
+def create_ground_plane(z, thickness=1, color=(0.9, 0.9, 0.9, 1.0)):
     """Create a large axis-aligned ground box.
 
     Args:
@@ -24,14 +24,15 @@ def create_ground_plane(z, thickness, color=(0.9, 0.9, 0.9, 1.0)):
         p.GEOM_BOX,
         halfExtents=[50000, 50000, thickness],
         rgbaColor=list(color),
-        visualFrameOrientation=[0, 0, 0, 1]
+        visualFrameOrientation=[0, 0, 0, 1], # one can create a tilted ground for better view in some cases
+        specularColor=[0, 0, 0] # the ground would not reflect light
     )
     
     p.createMultiBody(
         baseMass=0,
         baseCollisionShapeIndex=ground_collision_shape,
         baseVisualShapeIndex=ground_visual_shape,
-        basePosition=[0, 0, z]
+        basePosition=[0, 0, z-thickness]
     )
     
 
@@ -86,11 +87,10 @@ def build_extruded_visual_mesh(planar_vertices, normal, brick_thickness, center)
     return vis_vertices, vis_indices, vis_normals
 
 
-def create_extruded_geometry(vertices_flat, brick_thickness):
-    vertices_array = np.array(vertices_flat)
-    num_vertices = len(vertices_array) // 3
-    planar_vertices = vertices_array.reshape(num_vertices, 3)
-
+def create_extruded_geometry(vertices_per_tile, brick_thickness):
+    
+    planar_vertices = np.array(vertices_per_tile)
+    
     center = np.mean(planar_vertices, axis=0)
 
     vec1 = planar_vertices[1] - planar_vertices[0]
@@ -237,3 +237,15 @@ def transform_local_to_world_coordinates(body_ids, local_vertices):
         transformed_vertices.append(world_verts.tolist())
     
     return transformed_vertices
+
+def compute_min_z(vertices):
+        """
+        Return the minimal z from a List[List[List[float]]]
+        """
+        if not vertices:
+            return None
+        z = []
+        for tile in vertices:
+            for v in tile:
+                z.append(v[2])
+        return min(z)

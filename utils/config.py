@@ -5,30 +5,21 @@ import argparse
 import numpy as np
 import sys
 
-def load_vertices_from_file(filename):
+def load_vertices_from_file(path):
     """
-    Load 3D vertex data from file.
-    
-    Args:
-        filename: Path to the file containing 3D vertex data with n*3 values per line
-                 (x,y,z for n vertices). Supports both triangles (9 values) and 
-                 quadrilaterals (12 values). For 2D data, the script will add z=0 to each point.
-
+    Load vertices file where each line contains: x1 y1 z1 x2 y2 z2 ...
     Returns:
-        list: List of lists, where each sublist contains vertex coordinates for one shape.
-        [ [x1, y1, z1, x2, y2, z2, ...        xN, yN, zN] for N vertices of face 1
-          [x1, y1, z1, x2, y2, z2, ...        xN, yN, zN] for N vertices of face 2
-          ...
-        ]
+        List[List[List[float]]]: one entry per tile, each is [[x,y,z], [x,y,z], ...]
     """
     vertices = []
-    with open(filename, 'r') as file:
-        for line in file:
-            coords = list(map(float, line.strip().split()))
-            if len(coords) % 3 == 0 and len(coords) >= 9:  # At least 3 vertices (triangle)
-                vertices.append(coords)
-            else:
-                print(f"Warning: Skipping line with {len(coords)} values. Expected multiple of 3 with minimum 9 values.")
+    with open(path, "r") as f:
+        for line in f:
+            line = line.strip()
+            vals = [float(x) for x in line.split()]
+            if len(vals) % 3 != 0:
+                raise ValueError(f"Vertex line not multiple of 3 in {path}: {line}")
+            triplets = [[vals[i], vals[i+1], vals[i+2]] for i in range(0, len(vals), 3)]
+            vertices.append(triplets)
     return vertices
 
 def load_constraints_from_file(filename):
@@ -39,7 +30,7 @@ def load_constraints_from_file(filename):
         filename: Path to the file containing constraint data.
         
     Returns:
-        list: List of constraints.
+        List[Tuple[int, int, int, int, float]]: one entry per constraint
     """
     constraints = []
     with open(filename, 'r') as file:
@@ -55,14 +46,12 @@ def load_constraints_from_file(filename):
 
 def validate_constraints(vertices, constraints, max_distance=0.1):
     """
-    Validate that constraints in target vertices don't have excessive distances.
+    Validate points connected by constraints has same or almost same position.
     
-    This function checks if constraint endpoints in the target configuration
-    are close enough together to avoid physics instabilities.
     
     Args:
-        vertices: List of vertex arrays for each brick
-        constraints: List of constraint definitions [face1, vertex1, face2, vertex2, ...]
+        vertices: List[List[List[float]]]
+        constraints: List[Tuple[int, int, int, int, float]]
         max_distance: Maximum allowed distance between constraint endpoints (default: 0.1)
         
     Raises:
@@ -78,8 +67,8 @@ def validate_constraints(vertices, constraints, max_distance=0.1):
         f1, v1, f2, v2 = constraint[:4]
         
         # Get vertex positions for constraint endpoints
-        pos1 = np.array(vertices[f1][3*v1:3*v1+3])
-        pos2 = np.array(vertices[f2][3*v2:3*v2+3])
+        pos1 = np.array(vertices[f1][v1])
+        pos2 = np.array(vertices[f2][v2])
         
         # Calculate distance using numpy
         dist = np.linalg.norm(pos1 - pos2)

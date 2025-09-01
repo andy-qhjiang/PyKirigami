@@ -10,23 +10,16 @@ This module handles the initialization of the kirigami simulation, including:
 import numpy as np
 import pybullet as p
 from utils.config import load_vertices_from_file, load_constraints_from_file, validate_constraints
-from utils.geometry import create_extruded_geometry, create_brick_body, create_constraints_between_bricks, transform_local_to_world_coordinates, create_ground_plane
+from utils.geometry import create_extruded_geometry, create_brick_body, create_constraints_between_bricks, transform_local_to_world_coordinates, create_ground_plane, compute_min_z
 from utils.physics_utils import stabilize_bodies, calculate_vertex_based_forces
 
 class Simulation:
     """
     Handles initialization and setup of the kirigami simulation.
-    
-    This class is responsible for:
-    - Loading vertex and constraint data from input files
-    - Creating PyBullet physics bodies and constraints
-    - Setting up the initial simulation state
-    - Preparing data structures for runtime control
-    
-    The class does NOT handle:
-    - Runtime simulation stepping (handled by SimulationController)
-    - User interactions (handled by InteractionController)
-    - Force application during simulation (handled by SimulationController)
+
+    Attributes:
+        args (Namespace): Command-line arguments for the simulation.
+        simulation_data (dict): Dictionary to store simulation-related data.
     """
     def __init__(self, args):
         self.args = args
@@ -42,7 +35,7 @@ class Simulation:
         # Create new list for brick IDs
         brick_ids = []
         
-        # Load data
+        # Load data from file
         vertices = load_vertices_from_file(self.args.vertices_file)
         constraints = load_constraints_from_file(self.args.constraints_file)
         
@@ -63,82 +56,62 @@ class Simulation:
         
         print(f"Loaded {len(vertices)} bricks and {len(constraints)} constraints")
         
-        # Optionally compute min z for later ground placement
-        all_z = []
-        for flat in vertices:
-            # flat list length multiple of 3
-            z_vals = flat[2::3]
-            all_z.extend(z_vals)
-        if target_vertices:
-            for flat in target_vertices:
-                all_z.extend(flat[2::3])
-        min_z = min(all_z) if all_z else 0.0
 
         # Create bricks
-        local_verts_list = []  # Store local vertices for each brick
-        
+        local_vertices = []  # Store local vertices for each brick
+        visual_meshes = []  # Store visual meshes for export
+
         # Create each brick
-        for i, brick_vertices in enumerate(vertices):
+        for vertices_per_tile in vertices:
             # Create extruded 3D geometry from polygon vertices
-            (local_verts, visual_indices, center, vis_normals, vis_vertices) = create_extruded_geometry(
-                brick_vertices, self.args.brick_thickness
+            (local_verts_per_tile, vis_indices, center, vis_normals, vis_vertices) = create_extruded_geometry(
+                vertices_per_tile, self.args.brick_thickness
             )
             
             # Create brick body in physics engine
-            brick_id = create_brick_body(local_verts, visual_indices, center, vis_normals, vis_vertices)
+            brick_id = create_brick_body(local_verts_per_tile, vis_indices, center, vis_normals, vis_vertices)
             
             brick_ids.append(brick_id)
-            local_verts_list.append(local_verts)
-            
-            # Process target vertices if available (convert to same format as current_bottom)
-            if target_vertices and i < len(target_vertices):
-                target_brick_vertices = target_vertices[i]
-                # Convert flat target vertices to format like current_bottom
-                target_vertices_reshaped = []
-                for j in range(0, len(target_brick_vertices), 3):
-                    target_vertices_reshaped.append([
-                        target_brick_vertices[j],     # x
-                        target_brick_vertices[j+1],   # y
-                        target_brick_vertices[j+2]    # z
-                    ])
-                # Store target vertices for this brick
-                if 'target_bottom_vertices' not in locals():
-                    target_bottom_vertices = []
-                target_bottom_vertices.append(target_vertices_reshaped)
-        
-        # Initialize target_bottom_vertices if not created
-        if 'target_bottom_vertices' not in locals():
-            target_bottom_vertices = None
-            
+            local_vertices.append(local_verts_per_tile)
+
+            # Collect visual mesh for later export (OBJ/MTL)
+            visual_meshes.append(
+                {
+                    'vertices_local': vis_vertices,  # duplicated verts for flat shading
+                    'normals_local': vis_normals,     # one normal per emitted vertex
+                    'indices': vis_indices         # flat list, 3 per triangle
+                }
+            )
+
+
         # Stabilize bricks
         stabilize_bodies(brick_ids, 
                         linear_damping=self.args.linear_damping, 
                         angular_damping=self.args.angular_damping)
 
         if getattr(self.args, 'ground_plane', False):
-            # Place ground slightly below lowest geometry to avoid interference
-            offset = max(0.1, self.args.brick_thickness)
-            create_ground_plane(z=min_z - 2*offset, thickness=0.1)
+            min_z = min(compute_min_z(vertices), compute_min_z(target_vertices) if target_vertices else float('inf'))
+            create_ground_plane(z = min_z)
 
         # Create constraints between bricks
         constraint_ids = create_constraints_between_bricks(
-            brick_ids, constraints, local_verts_list
+            brick_ids, constraints, local_vertices
         )
         
         local_bottom_vertices = []
-        for local_verts in local_verts_list:
-            num_bottom = len(local_verts) // 2  # Compute number of bottom vertices
-            # Bottom vertices are the first num_bottom vertices in local_verts
-            local_bottom = local_verts[:num_bottom]
+        for local_verts_per_tile in local_vertices:
+            num_bottom = len(local_verts_per_tile) // 2 
+            local_bottom = local_verts_per_tile[:num_bottom]
             local_bottom_vertices.append(local_bottom)
 
         # Prepare simulation data
         self.simulation_data = {
             'args': self.args,
-            'target_vertices': target_bottom_vertices,
             'bricks': brick_ids,
-            'local_coords': local_bottom_vertices,  # Optimized for coordinate transforms
-            'constraint_ids': constraint_ids
+            'local_coords': local_bottom_vertices, # we only need local bottom vertices after brick creation
+            'constraint_ids': constraint_ids,
+            'visual_mesh': visual_meshes,
+            'target_vertices': target_vertices,  # None if not using target-based deployment
         }
         
         return self.simulation_data
@@ -207,7 +180,6 @@ class Simulation:
                 )
     
     
-
     def _apply_expansion_forces(self):
         """
         Apply center-of-mass based expansion forces to each brick:
@@ -238,3 +210,5 @@ class Simulation:
                 p.applyExternalForce(
                     body_id, -1, force.tolist(), pos.tolist(), flags=p.WORLD_FRAME
                 )
+
+    

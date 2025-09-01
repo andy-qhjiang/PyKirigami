@@ -7,6 +7,7 @@ Physics utilities for object manipulation in PyBullet simulations, including:
 import numpy as np
 import pybullet as p
 import pybullet_data
+import math
 
 def setup_physics_engine(gravity=(0, 0, -9.81), timestep=1/240, substeps=10, gui=True):
     """
@@ -97,6 +98,39 @@ def unfix_object_from_world(constraint_id):
         print(f"Warning: Could not remove constraint {constraint_id}: {e}")
         return False
 
+def getRayFromTo(mouseX, mouseY, camera_info):
+    """
+    generate the ray from the camera to the mouse position in the scene. 
+    This is a standard technique to determine the 3D position of the mouse in the world.
+
+    I learn this from one of the examples of pybullet
+    """
+
+    width, height, viewMat, projMat, cameraUp, camForward, horizon, vertical, _, _, dist, camTarget = camera_info
+    camPos = [
+        camTarget[0] - dist * camForward[0], camTarget[1] - dist * camForward[1],
+        camTarget[2] - dist * camForward[2]
+    ]
+    farPlane = 10000
+    rayForward = [(camTarget[0] - camPos[0]), (camTarget[1] - camPos[1]), (camTarget[2] - camPos[2])]
+    invLen = farPlane * 1. / (math.sqrt(rayForward[0] * rayForward[0] + rayForward[1] *
+                                        rayForward[1] + rayForward[2] * rayForward[2]))
+    rayForward = [invLen * rayForward[0], invLen * rayForward[1], invLen * rayForward[2]]
+    rayFrom = camPos
+    oneOverWidth = float(1) / float(width)
+    oneOverHeight = float(1) / float(height)
+    dHor = [horizon[0] * oneOverWidth, horizon[1] * oneOverWidth, horizon[2] * oneOverWidth]
+    dVer = [vertical[0] * oneOverHeight, vertical[1] * oneOverHeight, vertical[2] * oneOverHeight]
+    rayToCenter = [
+        rayFrom[0] + rayForward[0], rayFrom[1] + rayForward[1], rayFrom[2] + rayForward[2]
+    ]
+    rayTo = [
+        rayFrom[0] + rayForward[0] - 0.5 * horizon[0] + 0.5 * vertical[0] + float(mouseX) * dHor[0] -
+        float(mouseY) * dVer[0], rayFrom[1] + rayForward[1] - 0.5 * horizon[1] + 0.5 * vertical[1] +
+        float(mouseX) * dHor[1] - float(mouseY) * dVer[1], rayFrom[2] + rayForward[2] -
+        0.5 * horizon[2] + 0.5 * vertical[2] + float(mouseX) * dHor[2] - float(mouseY) * dVer[2]
+    ]
+    return rayFrom, rayTo
 
 
 def calculate_vertex_based_forces(current_vertices, target_vertices, spring_stiffness):

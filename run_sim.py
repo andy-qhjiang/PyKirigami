@@ -39,6 +39,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # Import from existing modules
 from utils.config import *
 from utils.physics_utils import setup_physics_engine
+from utils.export_info import export_obj_brick, export_obj_bottom
 from core.simulation import Simulation
 from core.simulation_controller import SimulationController
 from core.interaction_controller import InteractionController
@@ -99,7 +100,7 @@ def run_simulation(args):
     print("  S - Save vertex locations")
     print("  Space - Toggle pause/resume")
     print("  Q - Quit simulation")
-    print("  C - Capture snapshot (saved to output directory)")
+    print("  O - Export current state as OBJ")
     print("Mouse Controls:")
     print("  Right-click on a brick - Toggle fix/unfix")
     
@@ -128,8 +129,21 @@ def run_simulation(args):
             if ord('q') in keys and keys[ord('q')] & p.KEY_WAS_TRIGGERED:
                 print("Quitting simulation...")
                 break
-            if ord('c') in keys and keys[ord('c')] & p.KEY_WAS_TRIGGERED:
-                interaction_controller.snapshot(width=3800, height=2160)
+            if ord('o') in keys and keys[ord('o')] & p.KEY_WAS_TRIGGERED:
+                os.makedirs("output", exist_ok=True)
+                base = os.path.join("output", f"scene_{int(time.time())}_obj")
+                # we export two obj files here
+                export_obj_brick(
+                    file_path=base,
+                    bricks=simulation_controller.simulation_data['bricks'],
+                    visual_mesh=simulation_controller.simulation_data['visual_mesh'],
+                )
+                base = os.path.join("output", f"scene_{int(time.time())}_bottom.obj")
+                export_obj_bottom(
+                    file_path=base,
+                    bricks=simulation_controller.simulation_data['bricks'],
+                    local_bottom_vertices=simulation_controller.simulation_data['local_coords'],
+                )
 
             # Process mouse events for interaction controller (e.g., toggling fixed state)
             interaction_controller.process_mouse_events() 
