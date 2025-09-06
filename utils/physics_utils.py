@@ -33,7 +33,7 @@ def setup_physics_engine(gravity=(0, 0, -9.81), timestep=1/240, substeps=10, gui
     return client_id
 
 
-def stabilize_bodies(body_ids, linear_damping=1, angular_damping=1):
+def stabilize_bodies(body_ids, linear_damping=0.05, angular_damping=0.05):
     """
     Apply damping to bodies to stabilize them.
     
@@ -143,7 +143,7 @@ def calculate_vertex_based_forces(current_vertices, target_vertices, spring_stif
         spring_stiffness: Scalar stiffness k for the spring model
 
     Returns:
-        (net_force, net_torque): both as [fx, fy, fz] lists in world frame.
+        (net_force, net_torque): both as np.array([fx, fy, fz]) in world frame.
     """
     current_vertices = np.array(current_vertices)
     target_vertices = np.array(target_vertices)
@@ -164,7 +164,56 @@ def calculate_vertex_based_forces(current_vertices, target_vertices, spring_stif
         torque_contribution = np.cross(r_vector, vertex_force)
         net_torque += torque_contribution
 
-    return net_force.tolist(), net_torque.tolist()
+    return net_force, net_torque
+
+def calculate_kinetic_energy(body_id):
+    """
+    Calculates the total kinetic energy for a body whose geometry
+    is centered around its base frame origin.
+    
+    This assumes Center of Mass is at the base frame origin.
+    """
+    # Get mass and local inertia diagonal
+    dyn_info = p.getDynamicsInfo(body_id, -1)
+    mass = dyn_info[0]
+    local_inertia_diag = dyn_info[2]
+
+    # Get the state of the body (which is the state of the CoM)
+    pos, orn = p.getBasePositionAndOrientation(body_id)
+    linear_v, angular_v = p.getBaseVelocity(body_id)
+
+    # Convert to numpy arrays
+    linear_v = np.array(linear_v)
+    angular_v = np.array(angular_v)
+
+    # Calculate Translational Kinetic Energy
+    Ek_translational = 0.5 * mass * np.dot(linear_v, linear_v)
+
+    # Calculate Rotational Kinetic Energy
+    
+    # The inertia tensor is diagonal in the local frame. We need to
+    # transform it to the world frame to use with the world angular velocity.
+    
+    # Get the rotation matrix from the body's local frame to the world frame
+    R_local_to_world = np.array(p.getMatrixFromQuaternion(orn)).reshape(3, 3)
+    
+    # Construct the diagonal inertia tensor in the local frame
+    I_local = np.diag(local_inertia_diag)
+    
+    # Transform the inertia tensor to the world frame: I_world = R * I_local * R^T
+    I_world = R_local_to_world @ I_local @ R_local_to_world.T
+
+    # E_rot = 0.5 * ω^T * I_world * ω
+    Ek_rotational = 0.5 * angular_v.T @ I_world @ angular_v 
+
+    return Ek_translational, Ek_rotational
+
+def get_potential_energy_for_centered_body(body_id, gravity_z=-9.81):
+    """Calculates gravitational potential energy using the base position."""
+    mass = p.getDynamicsInfo(body_id, -1)[0]
+    # Since base position IS CoM position, this is correct
+    pos, _ = p.getBasePositionAndOrientation(body_id)
+    return mass * -gravity_z * pos[2]
 
 
 

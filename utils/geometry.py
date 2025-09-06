@@ -169,12 +169,6 @@ def create_constraints_between_bricks(bricks, constraints_with_types, local_vert
         num_1 = len(local_verts_list[f_i]) // 2
         num_2 = len(local_verts_list[f_p]) // 2
         
-        # Skip invalid constraints
-        if (f_i >= len(bricks) or f_p >= len(bricks) or 
-            v_j >= num_1 or v_q >= num_2):
-            print(f"Warning: Skipping invalid constraint input: {(f_i, v_j, f_p, v_q, constraint_type)}")
-            continue
-
         if constraint_type == 1: # Bottom point connection
             # Bottom vertices are first half of local_verts
             pivot_in_1 = local_verts_list[f_i][v_j]

@@ -161,7 +161,7 @@ class Simulation:
                 current_bottom_vertices[i], target_bottom_vertices[i], self.args.spring_stiffness
             )
             
-            total_force = np.array(applied_force) - np.array(linear_v) * self.args.force_damping
+            total_force = applied_force - np.array(linear_v) * self.args.force_damping
             
             # Apply forces to the body
             if np.linalg.norm(total_force) > 0:
@@ -175,7 +175,7 @@ class Simulation:
             if np.linalg.norm(total_torque) > 0:
                 p.applyExternalTorque(
                     body_id, -1,
-                    total_torque,
+                    total_torque.tolist(),
                     flags=p.WORLD_FRAME
                 )
     

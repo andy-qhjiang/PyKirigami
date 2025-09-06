@@ -37,16 +37,17 @@ def load_constraints_from_file(filename):
         for line in file:
             parts = list(map(int, line.strip().split()))
             if len(parts) == 4: # Old format: f_i, v_j, f_p, v_q
-                constraints.append([parts[0]-1, parts[1]-1, parts[2]-1, parts[3]-1, 1])
+                constraints.append([parts[0], parts[1], parts[2], parts[3], 1])
             elif len(parts) == 5: # New format: f_i, v_j, f_p, v_q, pa1
-                constraints.append([parts[0]-1, parts[1]-1, parts[2]-1, parts[3]-1, parts[4]])
+                constraints.append([parts[0], parts[1], parts[2], parts[3], parts[4]])
             else:
                 print(f"Warning: Skipping constraint line with {len(parts)} values. Expected 4 or 5.")
     return constraints
 
 def validate_constraints(vertices, constraints, max_distance=0.1):
     """
-    Validate points connected by constraints has same or almost same position.
+    Validate points connected by constraints has same or almost same positions.
+    Also validate no index is out of bounds and no duplicate constraints exist.
     
     
     Args:
@@ -62,9 +63,24 @@ def validate_constraints(vertices, constraints, max_distance=0.1):
     """
     if vertices is None:
         return
-        
+
+    constraints = sorted(constraints, key=lambda x: tuple(x))  # Sort constraints for duplicate detection
+    
+    for i in range(1, len(constraints)):
+        if constraints[i] == constraints[i-1]:
+            print(f"ERROR: Duplicate constraint found: {constraints[i]}")
+            sys.exit(1)
+    
     for i, constraint in enumerate(constraints):
         f1, v1, f2, v2 = constraint[:4]
+        
+        # Validate indices are within bounds
+        if f1 < 0 or f1 >= len(vertices) or f2 < 0 or f2 >= len(vertices):
+            print(f"ERROR: Constraint {constraint} has face index out of bounds")
+            sys.exit(1)
+        if v1 < 0 or v1 >= len(vertices[f1]) or v2 < 0 or v2 >= len(vertices[f2]):
+            print(f"ERROR: Constraint {constraint} has vertex index out of bounds")
+            sys.exit(1)
         
         # Get vertex positions for constraint endpoints
         pos1 = np.array(vertices[f1][v1])
@@ -72,12 +88,11 @@ def validate_constraints(vertices, constraints, max_distance=0.1):
         
         # Calculate distance using numpy
         dist = np.linalg.norm(pos1 - pos2)
-        
         if dist > max_distance:
-            error_msg = f"ERROR: Constraint {i} between faces {f1+1} and {f2+1} with vertices {v1+1} and {v2+1} has a large distance ({dist:.3f}) in target vertices."
+            error_msg = f"ERROR: Two points connected by constraint {constraint} has a large distance ({dist:.3f})."
             print(error_msg)
             print(f"This exceeds the maximum allowed distance of {max_distance:.3f} and will lead to unexpected behavior.")
-            print("Please check your target vertices file.")
+            print("Please check your vertices file.")
             sys.exit(1)
 
 def parse_arguments():
@@ -111,16 +126,25 @@ def parse_arguments():
     # Geometry parameters
     parser.add_argument('--brick_thickness', type=float, default=0.02,
                        help='Thickness of the brick (z-height)')
-    parser.add_argument('--linear_damping', type=float, default=1, help='Linear damping')
-    parser.add_argument('--angular_damping', type=float, default=1, help='Angular damping')
-    
-    
-  
+    parser.add_argument('--linear_damping', type=float, default=0.05, help='Linear damping')
+    parser.add_argument('--angular_damping', type=float, default=0.05, help='Angular damping')
+
+
     # Visual options
     parser.add_argument('--ground_plane', action='store_true',
                        help='Add a ground plane to the simulation')
     parser.add_argument('--camera_distance', type=float, default=8.0,
                        help='Distance of the camera from the origin')
+    
+    # Export batch options
+    parser.add_argument('--max_steps', type=int, default=2000,
+                       help='Maximum number of simulation steps for export obj only')
+    parser.add_argument('--auto_export_interval', type=int, default=0,
+                       help='Interval (in steps) to auto-export OBJ files. 0 means no auto-export.')
+    parser.add_argument('--export_prefix', type=str, default='export',
+                       help='Prefix for exported OBJ files')
+    parser.add_argument('--headless', action='store_true',
+                       help='Run in headless mode without GUI (for faster export)')
     
     args = parser.parse_args()
 
