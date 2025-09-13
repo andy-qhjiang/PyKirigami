@@ -4,7 +4,7 @@ Geometry utilities for the kirigami simulation project.
 import numpy as np
 import pybullet as p
 
-def create_ground_plane(z, thickness=1, color=(0.9, 0.9, 0.9, 1.0)):
+def create_ground_plane(z, thickness=1, color=(0.35, 0.35, 0.35, 1.0)):
     """Create a large axis-aligned ground box.
 
     Args:

@@ -99,11 +99,15 @@ def parse_arguments():
     """Parse command-line arguments for the simulation"""
     parser = argparse.ArgumentParser(description='Run kirigami simulation')
     
-    # Input files
-    parser.add_argument('--vertices_file', required=True, help='File containing vertex data')
-    parser.add_argument('--constraints_file', required=True, help='File with connectivity constraints')
-    parser.add_argument('--target_vertices_file', help='File containing target vertex positions for deployment (optional)')
-    
+    # Model folder
+    parser.add_argument('--model', type=str, help='Model folder name inside data/. If provided, default filenames are vertices.txt, constraints.txt, target.txt (target optional).')
+    parser.add_argument('--vertices_file', type=str, default='vertices.txt',
+                        help='Path to the vertices file (default: vertices.txt)')
+    parser.add_argument('--constraints_file', type=str, default='constraints.txt',
+                        help='Path to the constraints file (default: constraints.txt)')
+    parser.add_argument('--target_vertices_file', type=str, default='target.txt',
+                        help='Path to the target vertices file (optional, default: target.txt)')
+
     # Physics simulation parameters
     parser.add_argument('--gravity', type=float, default=0, help='Gravity constant')
     parser.add_argument('--timestep', type=float, default=1/240, help='Physics simulation timestep')
@@ -112,7 +116,7 @@ def parse_arguments():
 
 
     # target_based deployment parameters
-    parser.add_argument('--spring_stiffness', type=float, default=300,
+    parser.add_argument('--spring_stiffness', type=float, default=500,
                        help='Generic spring stiffness used by force models (replaces --target_stiffness)')
     parser.add_argument('--force_damping', type=float, default=50,
                        help='Generic damping used by force models (replaces --target_damping)')
@@ -147,6 +151,5 @@ def parse_arguments():
                        help='Run in headless mode without GUI (for faster export)')
     
     args = parser.parse_args()
-
 
     return args

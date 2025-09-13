@@ -10,22 +10,25 @@ Note: This script expects 3D vertex data with:
       For 2D data, users must preprocess files by adding z=0 to each point.
 
 Usage:
+    # --- Recommended: model folder usage ---
+    # Each model placed in data/<model>/ with files:
+    #   vertices.txt   (required)
+    #   constraints.txt (can be empty if no constraints)
+    #   target.txt     (optional)
+
     # Basic simulation with physics only (no deployment forces)
-    python run_sim.py --vertices_file fan_R10_r1_w3_h3_vertices.txt --constraints_file fan_R10_r1_w3_h3_constraints.txt  --ground_plane --gravity -200 --brick_thickness 0.1
+    python run_sim.py --model fan --ground_plane --brick_thickness 0.5 --gravity -200
 
-    # cm_expansion deployment:
-    python run_sim.py --vertices_file stampfli24_vertices_scaled.txt --constraints_file stampfli24_expansion_constraints.txt --ground_plane --gravity -100 --brick_thickness 0.1 --cm_expansion --camera_distance 12
-    
-    # Target-based deployment examples:
-    python run_sim.py --vertices_file cylinder_vertices.txt --constraints_file cylinder_constraints.txt --target_vertices_file cylinder_target.txt  --brick_thickness 0.1 --camera_distance 15
+    # cm_expansion deployment (no target file needed)
+    python run_sim.py --model stampfli24 --ground_plane --brick_thickness 0.5 --cm_expansion --camera_distance 12
 
-    python run_sim.py --vertices_file cube2sphere_w3_h3_vertices.txt --constraints_file cube2sphere_w3_h3_constraints.txt --target_vertices_file cube2sphere_w3_h3_target.txt --brick_thickness 0.02
+    # Target-based deployment examples (target.txt present in model folder)
+    python run_sim.py --model cylinder --brick_thickness 0.1 --camera_distance 15
+    python run_sim.py --model cube2sphere_w3_h3 --brick_thickness 0.02
+    python run_sim.py --model partialSphere --brick_thickness 0.02 --ground_plane
+    python run_sim.py --model heart --ground_plane --brick_thickness 0.5
+    python run_sim.py --model square2disk --ground_plane --brick_thickness 0.5
 
-    python run_sim.py --vertices_file partialSphere_vertices.txt --constraints_file partialSphere_constraints.txt --target_vertices_file partialSphere_target.txt  --brick_thickness 0.02
-
-    python run_sim.py --vertices_file heart_vertices.txt --constraints_file heart_constraints.txt --ground_plane --gravity -500 --brick_thickness 0.1 --target_vertices_file heart_target.txt --spring_stiffness 400 --force_damping 100 --camera_distance 8
-
-    python run_sim.py --vertices_file square2disk_vertices.txt --constraints_file square2disk_constraints.txt --target_vertices_file square2disk_target.txt --ground_plane --brick_thickness 0.1 --gravity -200 --spring_stiffness 250
 """
 import os
 import sys
@@ -162,23 +165,26 @@ def run_simulation(args):
 if __name__ == "__main__":
     args = parse_arguments()
     
-    # Handle relative paths for data files
+    # Handle relative paths for data files (with optional --model)
     data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+
     
+    model_dir = os.path.join(data_dir, args.model)
+    if not os.path.isdir(model_dir):
+        print(f"ERROR: Model folder '{args.model}' not found under data/")
+        sys.exit(1)
+    # Prepend model directory if paths are relative
     if not os.path.isabs(args.vertices_file):
-        potential_path = os.path.join(data_dir, args.vertices_file)
-        if os.path.exists(potential_path):
-            args.vertices_file = potential_path
-    
+        args.vertices_file = os.path.join(model_dir, args.vertices_file)
     if not os.path.isabs(args.constraints_file):
-        potential_path = os.path.join(data_dir, args.constraints_file)
-        if os.path.exists(potential_path):
-            args.constraints_file = potential_path
-    
+        args.constraints_file = os.path.join(model_dir, args.constraints_file)
     if args.target_vertices_file and not os.path.isabs(args.target_vertices_file):
-        potential_path = os.path.join(data_dir, args.target_vertices_file)
-        if os.path.exists(potential_path):
-            args.target_vertices_file = potential_path
+        candidate = os.path.join(model_dir, args.target_vertices_file)
+        if os.path.exists(candidate):
+            args.target_vertices_file = candidate
+        else:
+            # Allow absence silently
+            args.target_vertices_file = None
     
     # Run the simulation
     run_simulation(args)
