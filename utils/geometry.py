@@ -4,7 +4,7 @@ Geometry utilities for the kirigami simulation project.
 import numpy as np
 import pybullet as p
 
-def create_ground_plane(z, thickness=1, color=(0.35, 0.35, 0.35, 1.0)):
+def create_ground_plane(z, thickness=1, friction=0.5,color=(0.35, 0.35, 0.35, 1.0)):
     """Create a large axis-aligned ground box.
 
     Args:
@@ -27,13 +27,16 @@ def create_ground_plane(z, thickness=1, color=(0.35, 0.35, 0.35, 1.0)):
         visualFrameOrientation=[0, 0, 0, 1], # one can create a tilted ground for better view in some cases
         specularColor=[0, 0, 0] # the ground would not reflect light
     )
-    
-    p.createMultiBody(
+
+    ground_id = p.createMultiBody(
         baseMass=0,
         baseCollisionShapeIndex=ground_collision_shape,
         baseVisualShapeIndex=ground_visual_shape,
         basePosition=[0, 0, z-thickness]
     )
+    p.changeDynamics(ground_id, -1, lateralFriction=friction)
+    return ground_id
+
     
 
 def build_extruded_visual_mesh(planar_vertices, normal, brick_thickness, center):

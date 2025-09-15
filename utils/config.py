@@ -108,17 +108,23 @@ def parse_arguments():
     parser.add_argument('--target_vertices_file', type=str, default='target.txt',
                         help='Path to the target vertices file (optional, default: target.txt)')
 
+
     # Physics simulation parameters
-    parser.add_argument('--gravity', type=float, default=0, help='Gravity constant')
     parser.add_argument('--timestep', type=float, default=1/240, help='Physics simulation timestep')
     parser.add_argument('--substeps', type=int, default=20, help='Physics substeps per step')
+
+    # Physics environment parameters
+    parser.add_argument('--gravity', type=float, default=0, help='Gravity constant')
+    parser.add_argument('-gf', '--ground_friction', type=float, default=0.5, help='Friction coefficient')
+    parser.add_argument('--linear_damping', type=float, default=0.05, help='Linear damping')
+    parser.add_argument('--angular_damping', type=float, default=0.05, help='Angular damping')
     
 
 
     # target_based deployment parameters
-    parser.add_argument('--spring_stiffness', type=float, default=500,
+    parser.add_argument('-ss', '--spring_stiffness', type=float, default=500,
                        help='Generic spring stiffness used by force models (replaces --target_stiffness)')
-    parser.add_argument('--force_damping', type=float, default=50,
+    parser.add_argument('-fd', '--force_damping', type=float, default=50,
                        help='Generic damping used by force models (replaces --target_damping)')
 
     # Center-of-mass expansion mode
@@ -128,16 +134,15 @@ def parse_arguments():
 
 
     # Geometry parameters
-    parser.add_argument('--brick_thickness', type=float, default=0.02,
+    parser.add_argument('-bt', '--brick_thickness', type=float, default=0.02,
                        help='Thickness of the brick (z-height)')
-    parser.add_argument('--linear_damping', type=float, default=0.05, help='Linear damping')
-    parser.add_argument('--angular_damping', type=float, default=0.05, help='Angular damping')
+    
 
 
     # Visual options
-    parser.add_argument('--ground_plane', action='store_true',
+    parser.add_argument('-gp', '--ground_plane', action='store_true',
                        help='Add a ground plane to the simulation')
-    parser.add_argument('--camera_distance', type=float, default=8.0,
+    parser.add_argument('-cd', '--camera_distance', type=float, default=8.0,
                        help='Distance of the camera from the origin')
     
     # Export batch options
