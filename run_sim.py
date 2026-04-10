@@ -18,6 +18,7 @@ Usage:
 
     # Basic simulation with physics only (no deployment forces)
     python run_sim.py --model fan --ground_plane --brick_thickness 0.5 --gravity -200
+    python run_sim.py --model quad_tessellation --ground_plane --brick_thickness 0.5 --gravity -200 -ss 25 -gf 0.1 -fd 10
 
     # cm_expansion deployment (no target file needed)
     python run_sim.py --model stampfli24 --ground_plane --brick_thickness 0.5 --cm_expansion --camera_distance 12
@@ -27,7 +28,7 @@ Usage:
     python run_sim.py --model cube2sphere_w3_h3 --brick_thickness 0.02
     python run_sim.py --model partialSphere --brick_thickness 0.02 --ground_plane
     python run_sim.py --model heart --ground_plane --brick_thickness 0.5
-    python run_sim.py --model square2disk --ground_plane --brick_thickness 0.5
+    python run_sim.py --model square2disk --ground_plane --brick_thickness 0.5 -gf 0.01 -ss 100 -fd 5
 
 """
 import os
@@ -42,7 +43,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # Import from existing modules
 from utils.config import *
 from utils.physics_utils import setup_physics_engine
-from utils.export_info import export_obj_brick, export_obj_bottom
+from utils.export_info import export_obj_bottom
 from core.simulation import Simulation
 from core.simulation_controller import SimulationController
 from core.interaction_controller import InteractionController
@@ -108,7 +109,6 @@ def run_simulation(args):
     print("  Right-click on a brick - Toggle fix/unfix")
     
     # Main simulation loop
-    sim_step_count = 0 # for auto-export tracking
     try:
         while p.isConnected():
             # Handle keyboard events
@@ -121,7 +121,6 @@ def run_simulation(args):
                 interaction_controller.reset()
                 # Reset simulation via simulation controller
                 simulation_controller.reset_simulation()    
-                sim_step_count = 0            
                 
                 print("Simulation reset completed.")
 
@@ -134,9 +133,12 @@ def run_simulation(args):
             if ord('q') in keys and keys[ord('q')] & p.KEY_WAS_TRIGGERED:
                 print("Quitting simulation...")
                 break
+
             if ord('o') in keys and keys[ord('o')] & p.KEY_WAS_TRIGGERED:
-                os.makedirs("output", exist_ok=True)
-                base = os.path.join("output", f"scene_{int(time.time())}_bottom.obj")
+                model_name = getattr(args, 'model')
+                output_dir = os.path.join("output", model_name)
+                os.makedirs(output_dir, exist_ok=True)
+                base = os.path.join(output_dir, f"scene_{int(time.time())}_bottom.obj")
                 export_obj_bottom(
                     file_path=base,
                     bricks=simulation_controller.simulation_data['bricks'],
@@ -148,16 +150,6 @@ def run_simulation(args):
             
             # Step simulation (calculate all forces and detect collision in Bullet engine)
             simulation_controller.step_simulation()
-
-            if not simulation_controller.is_paused:
-                sim_step_count += 1
-                if getattr(args, 'auto_export_interval', 0) > 0 and sim_step_count % args.auto_export_interval == 0:
-                    base = os.path.join("output/sq2disk", f"auto_scene_step_{sim_step_count}_bottom.obj")
-                    export_obj_bottom(
-                        file_path=base,
-                        bricks=simulation_controller.simulation_data['bricks'],
-                        local_bottom_vertices=simulation_controller.simulation_data['local_coords'],
-                    )
 
             time.sleep(args.timestep)
             
