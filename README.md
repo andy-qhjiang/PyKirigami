@@ -62,7 +62,7 @@ python run_sim.py --model square2disk --ground_plane --brick_thickness 0.1 --gra
 
 ## Documentation
 Full manual is in the Wiki 
-https://github.com/andy-qhjiang/PyKirigami/wiki/Manual
+https://github.com/andy-qhjiang/PyKirigami/wiki
 
 ## Citation
 
