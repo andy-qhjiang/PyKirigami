@@ -1,0 +1,4 @@
+# python temporary files
+*.pyc
+.ipynb_checkpoints/
+**./*__pycache__/**
