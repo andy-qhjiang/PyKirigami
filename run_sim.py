@@ -17,18 +17,22 @@ Usage:
     #   target.txt     (optional)
 
     # Basic simulation with physics only (no deployment forces)
-    python run_sim.py --model fan --ground_plane --brick_thickness 0.5 --gravity -200
-    python run_sim.py --model quad_tessellation --ground_plane --brick_thickness 0.5 --gravity -200 -ss 25 -gf 0.1 -fd 10
+    python run_sim.py --model fan --ground_plane --brick_thickness 0.2 --gravity -20
+    python run_sim.py --model quad_tessellation --ground_plane --brick_thickness 0.2 --gravity -20
 
     # cm_expansion deployment (no target file needed)
-    python run_sim.py --model stampfli24 --ground_plane --brick_thickness 0.5 --cm_expansion --camera_distance 12
+    python run_sim.py --model stampfli24 -bt 0.2 --ground_plane --gravity -50 --cm_expansion
 
     # Target-based deployment examples (target.txt present in model folder)
-    python run_sim.py --model cylinder --brick_thickness 0.1 --camera_distance 15
+    python run_sim.py --model cylinder --brick_thickness 0.01
     python run_sim.py --model cube2sphere_w3_h3 --brick_thickness 0.02
-    python run_sim.py --model partialSphere --brick_thickness 0.02 --ground_plane
-    python run_sim.py --model heart --ground_plane --brick_thickness 0.5
-    python run_sim.py --model square2disk --ground_plane --brick_thickness 0.5 -gf 0.01 -ss 100 -fd 5
+    python run_sim.py --model mobius -bt 0.005
+    python run_sim.py --model sphere-to-saddle --brick_thickness 0.001 --auto_detect_connections
+    python run_sim.py --model stampfli132 --ground_plane --brick_thickness 0.1 --gravity -50
+    python run_sim.py --model partialSphere --brick_thickness 0.01
+    python run_sim.py --model heart --ground_plane --brick_thickness 0.2 --gravity -20
+    python run_sim.py --model square2disk --ground_plane --brick_thickness 0.2 --no_collision
+    
 
 """
 import os
@@ -62,14 +66,6 @@ def run_simulation(args):
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)  # Hide GUI panels
     p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 1)  # Enable shadows for better visualization
     p.configureDebugVisualizer(p.COV_ENABLE_KEYBOARD_SHORTCUTS, 0) # avoid conflict between default shortcuts and user-defined shortcuts
-
-    # Set up camera
-    p.resetDebugVisualizerCamera(
-        cameraDistance=args.camera_distance if hasattr(args, 'camera_distance') else 8.0,
-        cameraYaw=45,
-        cameraPitch=-30,
-        cameraTargetPosition=[0, 0, 0]
-    )
     
     # Create simulation instance
     simulation = Simulation(args)
@@ -78,17 +74,20 @@ def run_simulation(args):
     def initialize_simulation():
         return simulation.initialize()
     
-    def apply_forces():
-        simulation.apply_forces()
+    def apply_forces(active_tiles=None, stiffness_mult=1.0):
+        simulation.apply_forces(active_tiles, stiffness_mult)
+    
+    def compute_error(active_tiles=None):
+        return simulation.compute_max_error(active_tiles)
     
     # Initialize simulation for the first time
     sim_data = initialize_simulation()
     
-    
     # Create simulation functions dict
     simulation_functions = {
         'initialize_simulation': initialize_simulation,
-        'apply_forces': apply_forces
+        'apply_forces': apply_forces,
+        'compute_error': compute_error,
     }
     
     # Create simulation controller (replaces event handler)
@@ -105,6 +104,7 @@ def run_simulation(args):
     print("  Space - Toggle pause/resume")
     print("  Q - Quit simulation")
     print("  O - Export current state as OBJ")
+    print("  F - Toggle automatic deployment")
     print("Mouse Controls:")
     print("  Right-click on a brick - Toggle fix/unfix")
     
@@ -133,6 +133,9 @@ def run_simulation(args):
             if ord('q') in keys and keys[ord('q')] & p.KEY_WAS_TRIGGERED:
                 print("Quitting simulation...")
                 break
+
+            if ord('f') in keys and keys[ord('f')] & p.KEY_WAS_TRIGGERED:
+                simulation_controller.toggle_deployment()
 
             if ord('o') in keys and keys[ord('o')] & p.KEY_WAS_TRIGGERED:
                 model_name = getattr(args, 'model')
@@ -173,8 +176,13 @@ if __name__ == "__main__":
     # Prepend model directory if paths are relative
     if not os.path.isabs(args.vertices_file):
         args.vertices_file = os.path.join(model_dir, args.vertices_file)
-    if not os.path.isabs(args.constraints_file):
-        args.constraints_file = os.path.join(model_dir, args.constraints_file)
+    if args.constraints_file and not os.path.isabs(args.constraints_file):
+        candidate = os.path.join(model_dir, args.constraints_file)
+        if os.path.exists(candidate):
+            args.constraints_file = candidate
+        else:
+            print(f"Constraints file '{args.constraints_file}' not found — tiles will be independent.")
+            args.constraints_file = None
     if args.target_vertices_file and not os.path.isabs(args.target_vertices_file):
         candidate = os.path.join(model_dir, args.target_vertices_file)
         if os.path.exists(candidate):

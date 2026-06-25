@@ -35,16 +35,57 @@ def load_constraints_from_file(filename):
     constraints = []
     with open(filename, 'r') as file:
         for line in file:
-            parts = list(map(int, line.strip().split()))
-            if len(parts) == 4: # Old format: f_i, v_j, f_p, v_q
+            line = line.strip()
+            if not line:
+                continue
+            parts = list(map(int, line.split()))
+            # if len(parts) == 4, assume default type 1 (bottom)
+            if len(parts) == 4:
                 constraints.append([parts[0], parts[1], parts[2], parts[3], 1])
-            elif len(parts) == 5: # New format: f_i, v_j, f_p, v_q, pa1
-                constraints.append([parts[0], parts[1], parts[2], parts[3], parts[4]])
+            elif len(parts) == 5:
+                ctype = parts[4]
+                if ctype not in (1, 2, 3):
+                    print(f"ERROR: Constraint line '{line}' has invalid type {ctype}.")
+                    print("       Type must be 1 (bottom), 2 (top), or 3 (both).")
+                    sys.exit(1)
+                constraints.append([parts[0], parts[1], parts[2], parts[3], ctype])
             else:
-                print(f"Warning: Skipping constraint line with {len(parts)} values. Expected 4 or 5.")
+                print(f"ERROR: Constraint line '{line}' has {len(parts)} values. Expected 5.")
+                sys.exit(1)
     return constraints
 
-def validate_constraints(vertices, constraints, max_distance=0.1):
+
+def load_pull_list(filename):
+    """Load a pull-list file that specifies which tiles receive target forces.
+
+    The file contains space-separated tile IDs (0-indexed) on one or more
+    lines.  Only these tiles are pulled during deployment; the rest move
+    passively through constraints.
+
+    Example::
+        0 11 23 45 5 8 16 19
+
+    Args:
+        filename: Path to the pull-list file.
+
+    Returns:
+        set[int] or None: tile IDs to pull, or None if missing/unreadable.
+    """
+    import os
+    if not os.path.isfile(filename):
+        return None
+    ids = set()
+    with open(filename, 'r') as f:
+        for line in f:
+            for token in line.strip().split():
+                try:
+                    ids.add(int(token))
+                except ValueError:
+                    pass
+    return ids if ids else None
+
+
+def validate_constraints(vertices, constraints, max_distance=0.05):
     """
     Validate points connected by constraints has same or almost same positions.
     Also validate no index is out of bounds and no duplicate constraints exist.
@@ -53,8 +94,8 @@ def validate_constraints(vertices, constraints, max_distance=0.1):
     Args:
         vertices: List[List[List[float]]]
         constraints: List[Tuple[int, int, int, int, float]]
-        max_distance: Maximum allowed distance between constraint endpoints (default: 0.1)
-        
+        max_distance: Maximum allowed distance between constraint endpoints (default: 0.05)
+
     Raises:
         SystemExit: If any constraint has distance > max_distance
         
@@ -104,7 +145,7 @@ def parse_arguments():
     parser.add_argument('--vertices_file', type=str, default='vertices.txt',
                         help='Path to the vertices file (default: vertices.txt)')
     parser.add_argument('--constraints_file', type=str, default='constraints.txt',
-                        help='Path to the constraints file (default: constraints.txt)')
+                        help='Path to the constraints file (optional)')
     parser.add_argument('--target_vertices_file', type=str, default='target.txt',
                         help='Path to the target vertices file (optional, default: target.txt)')
 
@@ -122,7 +163,7 @@ def parse_arguments():
 
 
     # target_based deployment parameters
-    parser.add_argument('-ss', '--spring_stiffness', type=float, default=500,
+    parser.add_argument('-ss', '--spring_stiffness', type=float, default=100,
                        help='Generic spring stiffness used by force models (replaces --target_stiffness)')
     parser.add_argument('-fd', '--force_damping', type=float, default=50,
                        help='Generic damping used by force models (replaces --target_damping)')
@@ -134,10 +175,18 @@ def parse_arguments():
 
 
     # Geometry parameters
-    parser.add_argument('-bt', '--brick_thickness', type=float, default=0.02,
+    parser.add_argument('-bt', '--brick_thickness', type=float, default=0.01,
                        help='Thickness of the brick (z-height)')
     
 
+
+    # Auto-detection
+    parser.add_argument('-adc', '--auto_detect_connections', action='store_true', default=False,
+                       help='Auto-detect top/bottom connection types from target geometry (requires target.txt)')
+
+    # Collision settings
+    parser.add_argument('--no_collision', action='store_true', default=False,
+                       help='Disable collision between connected tile pairs (all tiles collide by default)')
 
     # Visual options
     parser.add_argument('-gp', '--ground_plane', action='store_true',

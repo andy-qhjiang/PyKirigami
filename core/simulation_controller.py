@@ -31,6 +31,19 @@ class SimulationController:
         self.simulation_data = simulation_data
         self.simulation_functions = simulation_functions
         self.is_paused = False
+
+        # Auto-enable deployment when a target file exists
+        has_target = self.simulation_data.get('target_vertices') is not None
+        self.deployment_enabled = has_target
+        if has_target:
+            print("Automatic deployment: ON (target detected, press F to toggle)")
+
+        # ---- Adaptive stiffness / stall recovery ----
+        self._stall_counter = 0          # consecutive steps without improvement
+        self._stall_threshold = 60       # steps before triggering recovery
+        self._best_error = float('inf')  # best error seen in current phase
+        self._stiffness_mult = 1.0       # progressive stiffness multiplier
+        self._last_reported_mult = 1.0   # suppress duplicate stall messages
     
     def reset_simulation(self):
         """
@@ -55,6 +68,12 @@ class SimulationController:
       
         # Reset pause state
         self.is_paused = False
+        has_target = self.simulation_data.get('target_vertices') is not None
+        self.deployment_enabled = has_target
+        self._stall_counter = 0
+        self._best_error = float('inf')
+        self._stiffness_mult = 1.0
+        self._last_reported_mult = 1.0
 
         print("Reset completed")
     
@@ -97,6 +116,21 @@ class SimulationController:
             self.is_paused = False
             print("Simulation resumed.")
 
+    def toggle_deployment(self):
+        """Toggle target-based deployment forces on/off."""
+        self.deployment_enabled = not self.deployment_enabled
+        if self.deployment_enabled:
+            self._stall_counter = 0
+            self._best_error = float('inf')
+            self._stiffness_mult = 1.0
+            self._last_reported_mult = 1.0
+        state = "ON" if self.deployment_enabled else "OFF"
+        pull_tiles = self.simulation_data.get('pull_tiles')
+        if self.deployment_enabled and pull_tiles:
+            print(f"Automatic deployment: {state} (pulling {len(pull_tiles)} tiles)")
+        else:
+            print(f"Automatic deployment: {state}")
+
     def step_simulation(self):
         """Run one step of the simulation, applying forces if not paused."""
         if self.is_paused:
@@ -106,6 +140,30 @@ class SimulationController:
             p.stepSimulation()
             return
             
-        # Apply forces (selection handled within Simulation.apply_forces)
-        self.simulation_functions['apply_forces']()
+        # Apply forces only when deployment is enabled (toggle with 'F' key)
+        if self.deployment_enabled:
+            pull_tiles = self.simulation_data.get('pull_tiles')
+            has_target = self.simulation_data.get('target_vertices') is not None
+
+            # ---- Stall detection & adaptive stiffness (target-based only) ----
+            if has_target:
+                current_err = self.simulation_functions['compute_error'](pull_tiles)
+                if current_err < self._best_error * 0.995:
+                    self._best_error = min(self._best_error, current_err)
+                    self._stall_counter = max(0, self._stall_counter - 1)
+                else:
+                    self._stall_counter += 1
+                    if self._stall_counter >= self._stall_threshold:
+                        prev_mult = self._stiffness_mult
+                        self._stiffness_mult = min(self._stiffness_mult * 2.0, 16.0)
+                        self._stall_counter = 0
+                        if self._stiffness_mult != prev_mult:
+                            self._last_reported_mult = self._stiffness_mult
+                            print(f"Stall detected (err={current_err:.4f}) → "
+                                  f"stiffness ×{self._stiffness_mult:.0f}")
+
+            self.simulation_functions['apply_forces'](
+                pull_tiles, self._stiffness_mult
+            )
+        
         p.stepSimulation()

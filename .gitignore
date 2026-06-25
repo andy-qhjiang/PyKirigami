@@ -2,3 +2,9 @@
 *.pyc
 .ipynb_checkpoints/
 **./*__pycache__/**
+
+.vscode
+
+# Ds_Store
+.DS_Store
+
