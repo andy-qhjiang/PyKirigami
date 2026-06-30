@@ -18,14 +18,14 @@ Usage:
 
     # Basic simulation with physics only (no deployment forces)
     python run_sim.py --model fan --ground_plane --brick_thickness 0.2 --gravity -20
-    python run_sim.py --model quad_tessellation --ground_plane --brick_thickness 0.2 --gravity -20
+    python run_sim.py --model tess_m5_n5 --ground_plane --brick_thickness 0.2 --gravity -20
 
     # cm_expansion deployment (no target file needed)
     python run_sim.py --model stampfli24 -bt 0.2 --ground_plane --gravity -50 --cm_expansion
 
     # Target-based deployment examples (target.txt present in model folder)
     python run_sim.py --model cylinder --brick_thickness 0.01
-    python run_sim.py --model cube2sphere_w3_h3 --brick_thickness 0.02
+    python run_sim.py --model cube2sphere_w3_h3 --brick_thickness 0.01
     python run_sim.py --model mobius -bt 0.005
     python run_sim.py --model sphere-to-saddle --brick_thickness 0.001 --auto_detect_connections
     python run_sim.py --model stampfli132 --ground_plane --brick_thickness 0.1 --gravity -50

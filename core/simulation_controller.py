@@ -34,7 +34,7 @@ class SimulationController:
 
         # Auto-enable deployment when a target file exists
         has_target = self.simulation_data.get('target_vertices') is not None
-        self.deployment_enabled = has_target
+        self.deployment_enabled = has_target or getattr(self.simulation_data.get('args', {}), 'cm_expansion', False)
         if has_target:
             print("Automatic deployment: ON (target detected, press F to toggle)")
 
@@ -69,7 +69,7 @@ class SimulationController:
         # Reset pause state
         self.is_paused = False
         has_target = self.simulation_data.get('target_vertices') is not None
-        self.deployment_enabled = has_target
+        self.deployment_enabled = has_target or getattr(self.simulation_data.get('args', {}), 'cm_expansion', False)
         self._stall_counter = 0
         self._best_error = float('inf')
         self._stiffness_mult = 1.0
@@ -146,7 +146,8 @@ class SimulationController:
             has_target = self.simulation_data.get('target_vertices') is not None
 
             # ---- Stall detection & adaptive stiffness (target-based only) ----
-            if has_target:
+            adaptive = not getattr(self.simulation_data.get('args', {}), 'no_adaptive_stiffness', False)
+            if has_target and adaptive:
                 current_err = self.simulation_functions['compute_error'](pull_tiles)
                 if current_err < self._best_error * 0.995:
                     self._best_error = min(self._best_error, current_err)

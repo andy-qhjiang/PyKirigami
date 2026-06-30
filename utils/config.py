@@ -167,6 +167,8 @@ def parse_arguments():
                        help='Generic spring stiffness used by force models (replaces --target_stiffness)')
     parser.add_argument('-fd', '--force_damping', type=float, default=50,
                        help='Generic damping used by force models (replaces --target_damping)')
+    parser.add_argument('--no_adaptive_stiffness', action='store_true', default=False,
+                       help='Disable automatic stiffness ramping (keep initial spring_stiffness)')
 
     # Center-of-mass expansion mode
     parser.add_argument('--cm_expansion', action='store_true',
@@ -181,7 +183,7 @@ def parse_arguments():
 
 
     # Auto-detection
-    parser.add_argument('-adc', '--auto_detect_connections', action='store_true', default=False,
+    parser.add_argument('--auto_detect_connections', action='store_true', default=False,
                        help='Auto-detect top/bottom connection types from target geometry (requires target.txt)')
 
     # Collision settings
